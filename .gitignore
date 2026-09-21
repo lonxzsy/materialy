@@ -1,0 +1,31 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/app/build
+captures
+.externalNativeBuild
+.cxx
+*.apk
+*.aab
+output-metadata.json
+
+# Local tools & SDKs
+.android
+.android-sdk
+.kotlin
+
+# Python & backend
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+*cookies.txt
+.pytest_cache/
+
+# Logs & temp test dumps
+*.log
+dump.xml
+screen_*.png

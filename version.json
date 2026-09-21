@@ -1,0 +1,6 @@
+{
+  "versionCode": 1,
+  "versionName": "1.0.0",
+  "downloadUrl": "https://github.com/lonxzsy/materialy/releases/download/v1.0.0/app-release.apk",
+  "releaseNotes": "Начальный релиз Materialy Music:\n- Интеллектуальный поток рекомендаций «Моя Волна»\n- Поддержка Material 3 Expressive с живой пружинной физикой\n- Офлайн-медиатека, эквалайзер и автомикс"
+}

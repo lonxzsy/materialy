@@ -1,0 +1,11 @@
+services:
+  music-server:
+    build: ./server
+    container_name: materialy-music-server
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./downloads:/tmp/materialy_downloads
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
