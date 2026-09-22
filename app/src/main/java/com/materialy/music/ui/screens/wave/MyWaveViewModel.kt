@@ -107,6 +107,7 @@ class MyWaveViewModel @Inject constructor(
     }
 
     fun skipNext() {
+        currentSong.value?.let { myWaveRepo.registerPlayed(it) }
         player.next()
     }
 
@@ -124,7 +125,7 @@ class MyWaveViewModel @Inject constructor(
     }
 
     fun dislikeAndSkip() {
-        // Soft skip with algorithmic negative weight simulation
+        currentSong.value?.let { myWaveRepo.registerDislike(it) }
         player.next()
     }
 

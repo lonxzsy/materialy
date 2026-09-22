@@ -147,6 +147,114 @@ class InnertubeExtractor @Inject constructor() {
     }
 
     /**
+     * Get radio / related songs for a given videoId using YouTube Music's WEB_REMIX next endpoint.
+     * This queries the recommendation graph for songs of the exact same style, mood, and genre.
+     */
+    suspend fun getSongRadio(videoId: String, limit: Int = 30): List<SearchResultItem> = withContext(Dispatchers.IO) {
+        val cleanId = extractVideoId(videoId) ?: videoId.trim()
+        if (cleanId.length != 11) return@withContext emptyList()
+
+        try {
+            val visitor = getVisitorData()
+            val bodyJson = """
+                {
+                    "context": {
+                        "client": {
+                            "clientName": "WEB_REMIX",
+                            "clientVersion": "1.20240101.00.00",
+                            "hl": "ru",
+                            "gl": "RU"${if (visitor != null) ",\n\"visitorData\": \"$visitor\"" else ""}
+                        }
+                    },
+                    "videoId": "$cleanId",
+                    "playlistId": "RDAMVM$cleanId",
+                    "isAudioOnly": true
+                }
+            """.trimIndent()
+
+            val reqBuilder = Request.Builder()
+                .url("https://music.youtube.com/youtubei/v1/next?prettyPrint=false")
+                .post(bodyJson.toRequestBody(jsonMediaType))
+                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+                .addHeader("Content-Type", "application/json")
+                .addHeader("Origin", "https://music.youtube.com")
+                .addHeader("Referer", "https://music.youtube.com/")
+
+            if (visitor != null) {
+                reqBuilder.addHeader("X-Goog-Visitor-Id", visitor)
+            }
+
+            val response = client.newCall(reqBuilder.build()).execute()
+            val rawBody = response.body?.string() ?: return@withContext emptyList()
+
+            val root = json.parseToJsonElement(rawBody).jsonObject
+            val results = mutableListOf<SearchResultItem>()
+            findPlaylistPanelVideoRenderers(root, results, limit)
+            results.distinctBy { it.id }.take(limit)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    private fun findPlaylistPanelVideoRenderers(element: JsonElement, results: MutableList<SearchResultItem>, limit: Int) {
+        if (results.size >= limit) return
+
+        when (element) {
+            is JsonObject -> {
+                if (element.containsKey("playlistPanelVideoRenderer")) {
+                    val r = element["playlistPanelVideoRenderer"]?.jsonObject
+                    if (r != null) {
+                        val videoId = r["videoId"]?.jsonPrimitive?.contentOrNull
+                        val title = extractText(r["title"])
+                        var artist = extractText(r["shortBylineText"])
+                        if (artist.isNullOrBlank()) {
+                            val longByline = r["longBylineText"]?.jsonObject?.get("runs")?.jsonArray
+                            val firstRun = longByline?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull
+                            if (!firstRun.isNullOrBlank()) {
+                                artist = firstRun
+                            }
+                        }
+                        if (artist.isNullOrBlank()) {
+                            artist = "YouTube"
+                        }
+                        val lengthStr = extractText(r["lengthText"])
+                        val duration = parseDurationString(lengthStr)
+                        val thumbs = r["thumbnail"]?.jsonObject?.get("thumbnails")?.jsonArray
+                        val thumbnail = thumbs?.lastOrNull()?.jsonObject?.get("url")?.jsonPrimitive?.contentOrNull
+
+                        if (videoId != null && !title.isNullOrBlank()) {
+                            results.add(
+                                SearchResultItem(
+                                    id = videoId,
+                                    title = title,
+                                    uploader = artist,
+                                    duration = duration,
+                                    durationFormatted = lengthStr ?: "${duration / 60}:${String.format("%02d", duration % 60)}",
+                                    thumbnail = thumbnail ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg",
+                                    url = "https://www.youtube.com/watch?v=$videoId"
+                                )
+                            )
+                        }
+                    }
+                } else {
+                    for ((_, child) in element) {
+                        findPlaylistPanelVideoRenderers(child, results, limit)
+                        if (results.size >= limit) return
+                    }
+                }
+            }
+            is JsonArray -> {
+                for (child in element) {
+                    findPlaylistPanelVideoRenderers(child, results, limit)
+                    if (results.size >= limit) return
+                }
+            }
+            else -> {}
+        }
+    }
+
+    /**
      * Get track info, available audio formats and stream URLs for video
      */
     suspend fun getInfo(urlOrId: String): InfoResponse = withContext(Dispatchers.IO) {
