@@ -1,6 +1,6 @@
 {
-  "versionCode": 1,
-  "versionName": "1.0.0",
-  "downloadUrl": "https://github.com/lonxzsy/materialy/releases/download/v1.0.0/app-release.apk",
-  "releaseNotes": "Начальный релиз Materialy Music:\n- Интеллектуальный поток рекомендаций «Моя Волна»\n- Поддержка Material 3 Expressive с живой пружинной физикой\n- Офлайн-медиатека, эквалайзер и автомикс"
+  "versionCode": 2,
+  "versionName": "1.0.1",
+  "downloadUrl": "https://github.com/lonxzsy/materialy/releases/download/v1.0.1/app-release.apk",
+  "releaseNotes": "Обновление Materialy Music v1.0.1:\n• Новый интеллектуальный алгоритм «Моя Волна» на базе нейронного графа YouTube Music Radio\n• Строгое исключение треков, уже имеющихся в медиатеке (никаких повторов, только новые треки того же стиля)\n• Глубокий скоринг вкусов на основе всей медиатеки, фаворитов и истории воспроизведения\n• Улучшенный режим «Открытия» для поиска новых исполнителей в любимых жанрах\n• Обновленная спецификация Material 3 Expressive и документация архитектуры"
 }
