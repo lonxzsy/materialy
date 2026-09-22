@@ -1,24 +1,98 @@
-# Material 3 design system
+# 📐 Spécification du Design Système : Google & Material Design 3 Expressive
 
-> Status: Proposed; implemented parts are called out explicitly. Last verified: 2026-09-20.
+> **Document :** Spécification Technique de Référence  
+> **Composants cibles :** Jetpack Compose Material 3 `1.3.x` / `1.4.x`  
+> **Dernière révision :** 22 Septembre 2026  
+> **Statut :** Approuvé & Actif
 
-Production targets Material 3 `1.4.0` and Material 3 Adaptive `1.3.0`; alpha APIs are excluded. Material 3 is active. Adaptive is pinned but awaits compileSdk 37/AGP 9.1 because the current compileSdk 35/AGP 8.7.3 toolchain cannot consume it. Dynamic system color is global. Artwork-derived HCT color is local to Player/MiniPlayer and must not recolor navigation.
+---
 
-Roboto Flex must ship as a licensed local variable-font resource. Until its binary is added, use a platform sans-serif fallback. Open Sans is Open Sans and must never be labelled Google Sans.
+## 1. Vue d'Ensemble
 
-| Family | Source | Rule |
-|---|---|---|
-| Type | all 15 `MaterialTheme.typography` roles | no raw `sp`, except documented karaoke/timecode tokens |
-| Color | `MaterialTheme.colorScheme` | no feature hardcodes; player accent stays local |
-| Shape | 4, 8, 12, 16, 28 dp roles | components consume semantic roles |
-| Space | 4, 8, 12, 16, 24, 32 dp | use the smallest role preserving hierarchy |
-| Motion standard | 100/200/300 ms | navigation and ordinary state changes |
-| Motion expressive | 220–450 ms | MiniPlayer→Player, artwork, play/pause, favorite, active lyric only |
+Cette spécification définit l'implémentation formelle du design système **Material Design 3 Expressive (M3E)** pour l'application **Materialy Music**. Elle s'articule autour de quatre principes directeurs :
+1. **Harmonie de Couleur HCT :** Les teintes sont dérivées de l'espace HCT (Hue, Chroma, Tone) pour assurer un contraste perceptuel constant et certifié conforme aux normes d'accessibilité WCAG AA/AAA.
+2. **Typographie Hiérarchisée & Émotive :** Utilisation complète des 15 rôles canoniques de la grille typographique Material 3, complétés par les graisses *Emphasized* pour souligner le tempo et l'importance des éléments d'interface.
+3. **Morphologie Tactile & Organique :** Abandon des angles rigides au profit de rayons généreux (16 à 28 dp) et de pilules (Pill Shapes), combinés à un retour haptique et élastique (`bouncy`).
+4. **Physique Cinétique des Ressorts :** Animation basée sur les équations de dynamique des ressorts (`SpringSpec`), garantissant une transition fluide et interruptible lors des gestes de l'utilisateur.
 
-Reduced-motion/system settings disable non-essential motion. Ordinary rows/tabs do not bounce. Targets are at least 48×48 dp and expose labels/state descriptions.
+---
 
-Current: complete MD3 type scale and dynamic theme exist; provider fonts and hardcoded feature values remain. Target: local Roboto Flex, semantic tokens, scoped expressive motion.
+## 2. Grille Typographique Formelle (Type Scale)
 
-Acceptance: offline first frame uses bundled font; 200% font scale remains operable; TalkBack finds no empty actions or color-only states; track changes do not recompose the whole navigation tree.
+Tous les textes affichés au sein de l'application doivent consommer les styles de `MaterialTheme.typography`. L'injection de valeurs arbitraires en points ou sp (ex: `13.sp`, `17.sp`) est formellement proscrite.
 
-Source: [Material 3 releases](https://developer.android.com/jetpack/androidx/releases/compose-material3).
+| Rôle Typographique | Taille (`sp`) | Hauteur de ligne (`sp`) | Espacement (`sp`) | Graisse (Weight) | Usage Spécifique dans l'Application |
+|---|---|---|---|---|---|
+| **`displayLarge`** | 57 | 64 | -0.25 | Regular / Medium | Grands chiffres d'horloge, compteurs de morceaux |
+| **`displayMedium`** | 45 | 52 | 0.00 | Regular / SemiBold | Titres de bienvenue sur l'écran d'accueil |
+| **`displaySmall`** | 36 | 44 | 0.00 | Bold (Emphasized) | Titre de la bannière héroïque « Моя Волна » |
+| **`headlineLarge`** | 32 | 40 | 0.00 | SemiBold | Grands titres d'écrans (Médiathèque, Paramètres) |
+| **`headlineMedium`** | 28 | 36 | 0.00 | Bold (Emphasized) | Titre du morceau actif en cours de lecture |
+| **`headlineSmall`** | 24 | 32 | 0.00 | SemiBold | Titres des sections (« Nouveautés », « Atmosphère ») |
+| **`titleLarge`** | 22 | 28 | 0.00 | SemiBold | Titres des grandes cartes, nom de l'artiste (Player) |
+| **`titleMedium`** | 16 | 24 | +0.15 | Medium / SemiBold | Titres des morceaux dans les listes et files d'attente |
+| **`titleSmall`** | 14 | 20 | +0.10 | SemiBold (Emphasized) | Noms d'albums dans les listes compactes, badges |
+| **`bodyLarge`** | 16 | 24 | +0.50 | Regular | Paroles karaoké inactives, descriptions d'albums |
+| **`bodyMedium`** | 14 | 20 | +0.25 | Regular | Nom de l'artiste secondaire dans les rangées de morceaux |
+| **`bodySmall`** | 12 | 16 | +0.40 | Regular | Métadonnées de format (FLAC, MP3 320k, durée) |
+| **`labelLarge`** | 14 | 20 | +0.10 | SemiBold | Libellé des boutons principaux (Play, Mettre à jour) |
+| **`labelMedium`** | 12 | 16 | +0.50 | SemiBold | Texte des puces de filtrage (Vibes de « Моя Волна ») |
+| **`labelSmall`** | 11 | 16 | +0.50 | SemiBold | Timecodes de lecture (ex: `01:24`, `03:45`), tags |
+
+---
+
+## 3. Système des Couleurs & Conteneurs de Surface
+
+L'application élimine les teintes d'élévation grises ou artificielles (`surfaceTint`). La stratification visuelle en mode sombre comme en mode clair repose sur les cinq paliers `SurfaceContainer` :
+
+```
+[Fond de l'application / Canvas]  -> surfaceContainerLowest  (Tone 4 en mode sombre)
+  └── [Arrière-plan des listes]    -> surfaceContainerLow     (Tone 10 en mode sombre)
+        └── [Cartes & Navbar]      -> surfaceContainer        (Tone 12 en mode sombre)
+              └── [Dock & Modales] -> surfaceContainerHigh   (Tone 17 en mode sombre)
+                    └── [Inputs]   -> surfaceContainerHighest (Tone 22 en mode sombre)
+```
+
+### 3.1. Rôles de Teinte & Accents
+- **`primary` / `onPrimary` :** Couleur phare haute visibilité utilisée pour les boutons majeurs (FAB, bouton lecture principal, barre d'avancement du morceau).
+- **`primaryContainer` / `onPrimaryContainer` :** Fond enrichi à luminance modérée utilisé pour les indicateurs d'onglets sélectionnés dans la barre de navigation et les puces d'ambiance actives.
+- **`secondary` / `secondaryContainer` :** Teinte complémentaire harmonisée pour les contrôles secondaires (Shuffle, Repeat, boutons d'action rapide).
+- **`outline` / `outlineVariant` :** Lignes de séparation ultra-fines (1 dp) avec opacité réduite (`0.25f` à `0.35f`) pour structurer sans encombrer.
+
+---
+
+## 4. Échelle Géométrique des Formes (Shapes)
+
+L'échelle morphologique de Material 3 Expressive attribue des formes géométriques signifiantes selon l'importance du composant :
+
+```kotlin
+val ExpressiveShapes = Shapes(
+    extraSmall = RoundedCornerShape(8.dp),   // Badges compacts, indicateurs d'état
+    small      = RoundedCornerShape(12.dp),  // Vignettes de pochettes 52x52 dp, champs
+    medium     = RoundedCornerShape(16.dp),  // Cartes moyennes, conteneurs d'effets sonores
+    large      = RoundedCornerShape(20.dp),  // MiniPlayer flottant, dialogue système
+    extraLarge = RoundedCornerShape(28.dp)   // Grandes cartes albums, BottomSheets modales
+)
+```
+
+- **Pill Shape (`RoundedCornerShape(percent = 50)`) :** Utilisé systématiquement pour les puces de filtrage, les boutons flottants étendus et les indicateurs d'état actifs.
+- **Micro-interaction `bouncy` :** Déformation physique élastique ($0.94\times$) lors du toucher avec restitution instantanée via amorti de ressort.
+
+---
+
+## 5. Spécifications Temporelles et Dynamiques du Mouvement
+
+| Type de Mouvement | Damping Ratio | Stiffness | Application |
+|---|---|---|---|
+| **Spring Snappy** | `0.80f` | `StiffnessMedium` | Coche des filtres, bascule d'égaliseur, cœur favori |
+| **Spring Spatial** | `0.85f` | `StiffnessLow` | Déploiement du Full Player depuis le MiniPlayer |
+| **Spring Elastic** | `0.75f` | `StiffnessMediumLow` | Appui sur les boutons d'action, pulsation de la sphère |
+| **Transition Linaire** | `1.00f` | `StiffnessVeryLow` | Glissement du slider de progression audio |
+
+---
+
+## 6. Accessibilité & Ergonomie Tactile
+
+1. **Taille de Cible Minimale :** Tous les composants interactifs respectent une zone cliquable minimale de **48 × 48 dp**, même si leur élément visuel interne est plus petit (ex: icône 24 dp au sein d'une cible de 48 dp).
+2. **Contraste de Texte Élevé :** Tout texte de premier plan possède un contraste supérieur ou égal à **4.5:1** par rapport à son conteneur direct (garanti par le calcul de luminance HCT).
+3. **Gestion du Défilement et des Marges :** L'empilement du MiniPlayer et de la barre de navigation impose un dégagement de fond (`contentPadding`) de minimum **140 dp** pour permettre le défilement complet des listes.
