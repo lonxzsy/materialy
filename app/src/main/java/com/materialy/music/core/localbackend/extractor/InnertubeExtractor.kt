@@ -147,6 +147,32 @@ class InnertubeExtractor @Inject constructor() {
     }
 
     /**
+     * Get real-time search suggestions with rapid auto-complete
+     */
+    suspend fun getSearchSuggestions(query: String): List<String> = withContext(Dispatchers.IO) {
+        val clean = query.trim()
+        if (clean.isBlank()) return@withContext emptyList()
+        try {
+            val url = "https://suggestqueries-clients6.youtube.com/complete/search?client=firefox&ds=yt&q=${java.net.URLEncoder.encode(clean, "UTF-8")}"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext emptyList()
+                val body = response.body?.string() ?: return@withContext emptyList()
+                val rootArray = json.parseToJsonElement(body).jsonArray
+                if (rootArray.size > 1) {
+                    val suggestionsArray = rootArray[1].jsonArray
+                    return@withContext suggestionsArray.mapNotNull { it.jsonPrimitive.contentOrNull }
+                }
+            }
+        } catch (_: Exception) {}
+        emptyList()
+    }
+
+    /**
      * Get radio / related songs for a given videoId using YouTube Music's WEB_REMIX next endpoint.
      * This queries the recommendation graph for songs of the exact same style, mood, and genre.
      */
@@ -690,36 +716,6 @@ class InnertubeExtractor @Inject constructor() {
         return String.format("%.1f %s", value, units[digitGroups])
     }
 
-    /**
-     * Get live search query suggestions
-     */
-    suspend fun getSearchSuggestions(query: String): List<String> = withContext(Dispatchers.IO) {
-        val clean = query.trim()
-        if (clean.isBlank()) return@withContext emptyList()
-        try {
-            val url = "https://suggestqueries.google.com/complete/search?client=youtube&ds=yt&q=${java.net.URLEncoder.encode(clean, "UTF-8")}&hl=ru"
-            val req = Request.Builder()
-                .url(url)
-                .addHeader("User-Agent", "Mozilla/5.0")
-                .build()
-            val resp = client.newCall(req).execute()
-            val body = resp.body?.string() ?: return@withContext emptyList()
-
-            // Google returns JSONP or JSON array: window.google.ac.h(["query",[["s1",0],["s2",0]]]) or ["query",[["s1",0]]]
-            val jsonText = if (body.startsWith("window.google.ac.h(")) {
-                body.removePrefix("window.google.ac.h(").removeSuffix(")")
-            } else body
-
-            val rootArray = json.parseToJsonElement(jsonText).jsonArray
-            if (rootArray.size > 1) {
-                val suggestionsArray = rootArray[1].jsonArray
-                return@withContext suggestionsArray.mapNotNull {
-                    it.jsonArray.firstOrNull()?.jsonPrimitive?.contentOrNull
-                }
-            }
-        } catch (_: Exception) {}
-        emptyList()
-    }
 
     /**
      * Fetch home feed curated shelves
@@ -751,7 +747,8 @@ class InnertubeExtractor @Inject constructor() {
             }
 
             // 2. New Releases
-            val newItems = search("Новинки музыки 2024", limit = 10).map {
+            val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+            val newItems = search("Новинки музыки $currentYear", limit = 10).map {
                 ShelfItem(
                     id = it.id,
                     title = it.title,

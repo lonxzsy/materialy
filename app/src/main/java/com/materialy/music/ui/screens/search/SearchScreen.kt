@@ -97,7 +97,7 @@ fun SearchScreen(
     val focusManager = LocalFocusManager.current
 
     val categories = listOf(
-        CategoryItem("Поп", "Поп музыка 2024", listOf(Color(0xFF8E24AA), Color(0xFFD81B60)), Icons.Filled.Headphones),
+        CategoryItem("Поп", "Популярные хиты", listOf(Color(0xFF8E24AA), Color(0xFFD81B60)), Icons.Filled.Headphones),
         CategoryItem("Хип-хоп & Рэп", "Хип хоп рэп", listOf(Color(0xFFE65100), Color(0xFFFF8F00)), Icons.Filled.Speaker),
         CategoryItem("Рок & Драйв", "Рок музыка", listOf(Color(0xFF3949AB), Color(0xFF1E88E5)), Icons.Filled.ElectricBolt),
         CategoryItem("Lo-Fi & Chill", "Lo-Fi Beats", listOf(Color(0xFF00695C), Color(0xFF00897B)), Icons.Filled.Radio),
@@ -188,17 +188,18 @@ fun SearchScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
                             .clickable {
                                 focusManager.clearFocus()
                                 viewModel.performSearch(sug)
                             }
-                            .padding(vertical = 12.dp, horizontal = 8.dp),
+                            .padding(vertical = 12.dp, horizontal = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.History,
+                            imageVector = Icons.Filled.Search,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(16.dp))

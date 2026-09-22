@@ -60,13 +60,13 @@ class SearchViewModel @Inject constructor(
     val hasSearched: StateFlow<Boolean> = _hasSearched.asStateFlow()
 
     val categories = listOf(
-        SearchCategory("Поп", 0xFFE91E63, "Поп музыка 2024"),
+        SearchCategory("Поп", 0xFFE91E63, "Популярные хиты"),
         SearchCategory("Хип-хоп & Рэп", 0xFFFF5722, "Хип хоп рэп"),
         SearchCategory("Рок & Альтернатива", 0xFF673AB7, "Рок музыка"),
         SearchCategory("Lo-Fi & Chill", 0xFF009688, "Lo-Fi Beats"),
         SearchCategory("Электроника & EDM", 0xFF00BCD4, "EDM Dance Music"),
         SearchCategory("Фонк", 0xFF9C27B0, "Phonk drift"),
-        SearchCategory("Тренды TikTok", 0xFFFF4081, "Тренды Тикток музыка"),
+        SearchCategory("Тренды", 0xFFFF4081, "Тренды чарты"),
         SearchCategory("Классика & Саундтреки", 0xFF795548, "OST Soundtracks")
     )
 

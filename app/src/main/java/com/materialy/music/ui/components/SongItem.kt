@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Favorite
@@ -252,6 +253,14 @@ fun SongItem(
                             contentDescription = if (isAvailable) "Онлайн" else "Оффлайн",
                             tint = if (!isAvailable) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
                             else MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                    } else if (song.isOfflineAvailable()) {
+                        Icon(
+                            imageVector = Icons.Filled.CheckCircle,
+                            contentDescription = "Сохранено на устройстве",
+                            tint = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.85f),
                             modifier = Modifier.size(13.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))

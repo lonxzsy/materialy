@@ -44,4 +44,15 @@ data class SongEntity(
     val artworkThumbPath: String? = null,
     val sourceUrl: String? = null,
     val sourceType: String? = null // youtube / soundcloud / local
-)
+) {
+    fun isOfflineAvailable(): Boolean {
+        if (sourceType.equals("local", ignoreCase = true) || sourceType.equals("download", ignoreCase = true)) return true
+        if (fileUri.isNotBlank() && !fileUri.startsWith("http://") && !fileUri.startsWith("https://")) return true
+        if (relativePath.isNotBlank()) {
+            try {
+                if (java.io.File(relativePath).exists()) return true
+            } catch (_: Exception) {}
+        }
+        return false
+    }
+}

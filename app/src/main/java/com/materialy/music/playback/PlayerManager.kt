@@ -39,7 +39,8 @@ class PlayerManager @Inject constructor(
     private val audioSettingsRepo: AudioSettingsRepository,
     private val audioEffectsManager: AudioEffectsManager,
     private val musicRepository: com.materialy.music.data.repository.MusicRepository,
-    private val onlineSongDao: com.materialy.music.data.db.dao.OnlineSongDao
+    private val onlineSongDao: com.materialy.music.data.db.dao.OnlineSongDao,
+    private val directStreamResolver: DirectStreamResolver
 ) : PlaybackCoordinator {
     private val TAG = "PlayerManager"
     private var controllerFuture: ListenableFuture<MediaController>? = null
@@ -187,6 +188,8 @@ class PlayerManager @Inject constructor(
         }
     }
 
+    private var lastPreloadedIndex = -1
+
     private fun startPositionTicker() {
         positionTickerJob?.cancel()
         positionTickerJob = scope.launch {
@@ -199,8 +202,33 @@ class PlayerManager @Inject constructor(
                         _queue.value = _queue.value.copy(positionMs = c.currentPosition.coerceAtLeast(0L))
                         persistSession(c)
                     }
+
+                    // Proactive preloading of next track when reached 75% of current song
+                    val currentIndex = c.currentMediaItemIndex
+                    val nextIndex = currentIndex + 1
+                    if (dur > 0 && c.currentPosition > dur * 0.75f && nextIndex < c.mediaItemCount && nextIndex != lastPreloadedIndex) {
+                        lastPreloadedIndex = nextIndex
+                        preloadNextTrack(c, nextIndex)
+                    }
                 }
                 delay(300)
+            }
+        }
+    }
+
+    private fun preloadNextTrack(c: MediaController, nextIndex: Int) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (nextIndex in 0 until c.mediaItemCount) {
+                    val nextItem = c.getMediaItemAt(nextIndex)
+                    val uri = nextItem.localConfiguration?.uri?.toString() ?: ""
+                    if (uri.isNotBlank()) {
+                        directStreamResolver.resolveStreamAsync(uri)
+                        Log.d(TAG, "Proactively pre-resolved next track stream: $uri")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "Proactive preload error: ${e.message}")
             }
         }
     }
@@ -329,6 +357,15 @@ class PlayerManager @Inject constructor(
             } else {
                 c.play()
             }
+        }
+    }
+
+    fun fadeOutAndPause(durationMs: Long = 2000L, onComplete: (() -> Unit)? = null) {
+        val c = controller ?: return
+        audioEffectsManager.fadeOut(c, durationMs = durationMs) {
+            c.pause()
+            _isPlaying.value = false
+            onComplete?.invoke()
         }
     }
 

@@ -1,18 +1,27 @@
 package com.materialy.music.ui.screens.player
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -73,7 +82,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
@@ -120,6 +133,7 @@ class PlayerViewModel @Inject constructor(
     val duration = player.durationMs
     val repeatMode = player.repeatMode
     val shuffleEnabled = player.shuffleEnabled
+    val bassEnergy = player.bassEnergy
 
     private val _lyrics = MutableStateFlow<List<LrcLine>>(emptyList())
     val lyrics: StateFlow<List<LrcLine>> = _lyrics.asStateFlow()
@@ -170,10 +184,14 @@ class PlayerViewModel @Inject constructor(
         _sleepTimerMinutes.value = minutes
         if (minutes != null && minutes > 0) {
             sleepTimerJob = viewModelScope.launch {
-                delay(minutes * 60 * 1000L)
-                player.togglePlayPause()
-                _sleepTimerMinutes.value = null
-                ToastManager.info("Таймер сна сработал: пауза")
+                val totalMs = minutes * 60 * 1000L
+                val fadeMs = 6000L.coerceAtMost(totalMs / 2)
+                val initialDelay = (totalMs - fadeMs).coerceAtLeast(0L)
+                delay(initialDelay)
+                player.fadeOutAndPause(durationMs = fadeMs) {
+                    _sleepTimerMinutes.value = null
+                    ToastManager.info("Таймер сна сработал: плавное затухание")
+                }
             }
         }
     }
@@ -205,6 +223,7 @@ fun PlayerScreen(
     val isLoadingLyrics by viewModel.isLoadingLyrics.collectAsState()
     val showLyrics by viewModel.showLyrics.collectAsState()
     val sleepTimer by viewModel.sleepTimerMinutes.collectAsState()
+    val bassEnergy by viewModel.bassEnergy.collectAsState()
 
     var showSleepTimerDialog by remember { mutableStateOf(false) }
 
@@ -235,7 +254,17 @@ fun PlayerScreen(
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Dynamic Blurred Album Artwork Background
+        // Fluid Animated Mesh Gradient Canvas (Apple Music & Tidal 2026 style)
+        FluidMeshBackground(
+            primaryColor = MaterialTheme.colorScheme.primary,
+            secondaryColor = MaterialTheme.colorScheme.secondary,
+            tertiaryColor = MaterialTheme.colorScheme.tertiary,
+            surfaceColor = MaterialTheme.colorScheme.surface,
+            bassEnergy = bassEnergy,
+            isPlaying = isPlaying
+        )
+
+        // Subtle Blurred Album Artwork overlay
         val artworkPath = song?.artworkPath
         if (!artworkPath.isNullOrBlank()) {
             val model = if (artworkPath.startsWith("http://") || artworkPath.startsWith("https://")) {
@@ -249,24 +278,10 @@ fun PlayerScreen(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
-                    .blur(50.dp)
+                    .blur(70.dp)
+                    .alpha(0.40f)
             )
         }
-
-        // Dark Vignette Gradient Overlay for high readability
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                            MaterialTheme.colorScheme.surface
-                        )
-                    )
-                )
-        )
 
         Column(
             modifier = Modifier
@@ -493,8 +508,29 @@ fun PlayerScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Tactile Seek Bar (Progress Slider)
+            // Tactile Seek Bar (Progress Slider with spring dynamics)
             Column(modifier = Modifier.fillMaxWidth()) {
+                AnimatedVisibility(
+                    visible = isDraggingSlider,
+                    enter = fadeIn() + scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)),
+                    exit = fadeOut() + scaleOut(),
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    ) {
+                        Text(
+                            text = String.format("%d:%02d / %d:%02d", curMins, curSecs, totalMins, totalSecs),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+
                 Slider(
                     value = sliderProgress,
                     onValueChange = {
@@ -522,7 +558,8 @@ fun PlayerScreen(
                     Text(
                         text = String.format("%d:%02d", curMins, curSecs),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        fontWeight = if (isDraggingSlider) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isDraggingSlider) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = String.format("%d:%02d", totalMins, totalSecs),
@@ -701,6 +738,104 @@ fun PlayerScreen(
                     Text("Закрыть")
                 }
             }
+        )
+    }
+}
+
+@Composable
+fun FluidMeshBackground(
+    primaryColor: Color,
+    secondaryColor: Color,
+    tertiaryColor: Color,
+    surfaceColor: Color,
+    bassEnergy: Float,
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "fluidMesh")
+    val phase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 6.28318f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 14000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "meshPhase"
+    )
+
+    val animatedBass by animateFloatAsState(
+        targetValue = if (isPlaying) bassEnergy.coerceIn(0.15f, 0.95f) else 0.15f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
+        label = "meshBass"
+    )
+
+    Canvas(modifier = modifier.fillMaxSize()) {
+        val w = size.width
+        val h = size.height
+        if (w <= 0 || h <= 0) return@Canvas
+
+        drawRect(color = surfaceColor)
+
+        val c1X = w * (0.35f + 0.20f * sin(phase))
+        val c1Y = h * (0.30f + 0.15f * cos(phase * 0.8f))
+        val r1 = (w * 0.75f) * (0.85f + 0.35f * animatedBass)
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    primaryColor.copy(alpha = 0.42f + 0.20f * animatedBass),
+                    primaryColor.copy(alpha = 0.12f),
+                    Color.Transparent
+                ),
+                center = Offset(c1X, c1Y),
+                radius = r1
+            ),
+            radius = r1,
+            center = Offset(c1X, c1Y)
+        )
+
+        val c2X = w * (0.70f + 0.18f * cos(phase * 1.1f))
+        val c2Y = h * (0.65f + 0.16f * sin(phase * 0.7f))
+        val r2 = (w * 0.80f) * (0.80f + 0.30f * animatedBass)
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    secondaryColor.copy(alpha = 0.38f + 0.18f * animatedBass),
+                    secondaryColor.copy(alpha = 0.10f),
+                    Color.Transparent
+                ),
+                center = Offset(c2X, c2Y),
+                radius = r2
+            ),
+            radius = r2,
+            center = Offset(c2X, c2Y)
+        )
+
+        val c3X = w * (0.25f + 0.22f * cos(phase * 0.6f + 1.2f))
+        val c3Y = h * (0.80f + 0.12f * sin(phase * 0.9f))
+        val r3 = (w * 0.70f) * (0.75f + 0.25f * animatedBass)
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    tertiaryColor.copy(alpha = 0.32f + 0.15f * animatedBass),
+                    tertiaryColor.copy(alpha = 0.08f),
+                    Color.Transparent
+                ),
+                center = Offset(c3X, c3Y),
+                radius = r3
+            ),
+            radius = r3,
+            center = Offset(c3X, c3Y)
+        )
+
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    surfaceColor.copy(alpha = 0.65f),
+                    surfaceColor.copy(alpha = 0.45f),
+                    surfaceColor.copy(alpha = 0.85f),
+                    surfaceColor.copy(alpha = 0.95f)
+                )
+            )
         )
     }
 }

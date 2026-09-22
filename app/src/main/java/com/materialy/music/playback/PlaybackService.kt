@@ -59,7 +59,9 @@ class PlaybackService : MediaLibraryService() {
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(WAKE_MODE_NETWORK)
-            .build()
+            .build().apply {
+                preloadConfiguration = ExoPlayer.PreloadConfiguration(8_000_000L)
+            }
 
         audioEffectsManager.attachPlayer(player)
 

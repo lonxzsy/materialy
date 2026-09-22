@@ -53,6 +53,8 @@ class AudioSettingsRepository @Inject constructor(
 
     private val smoothAudioEnabledKey = booleanPreferencesKey("smooth_audio_enabled")
     private val smoothAudioDurationMsKey = longPreferencesKey("smooth_audio_duration_ms")
+    private val loudnessNormalizationKey = booleanPreferencesKey("loudness_normalization_enabled")
+    private val offlineModeKey = booleanPreferencesKey("offline_mode_enabled")
 
     val equalizerEnabledFlow: Flow<Boolean> = context.audioSettingsDs.data.map { it[equalizerEnabledKey] ?: false }
     val selectedPresetNameFlow: Flow<String> = context.audioSettingsDs.data.map { it[selectedPresetNameKey] ?: "Обычный (Flat)" }
@@ -71,6 +73,8 @@ class AudioSettingsRepository @Inject constructor(
 
     val smoothAudioEnabledFlow: Flow<Boolean> = context.audioSettingsDs.data.map { it[smoothAudioEnabledKey] ?: true }
     val smoothAudioDurationMsFlow: Flow<Long> = context.audioSettingsDs.data.map { it[smoothAudioDurationMsKey] ?: 2000L }
+    val loudnessNormalizationFlow: Flow<Boolean> = context.audioSettingsDs.data.map { it[loudnessNormalizationKey] ?: true }
+    val offlineModeFlow: Flow<Boolean> = context.audioSettingsDs.data.map { it[offlineModeKey] ?: false }
 
     suspend fun setEqualizerEnabled(enabled: Boolean) {
         context.audioSettingsDs.edit { it[equalizerEnabledKey] = enabled }
@@ -138,5 +142,13 @@ class AudioSettingsRepository @Inject constructor(
 
     suspend fun setSmoothAudioDurationMs(durationMs: Long) {
         context.audioSettingsDs.edit { it[smoothAudioDurationMsKey] = durationMs.coerceIn(500L, 5000L) }
+    }
+
+    suspend fun setLoudnessNormalization(enabled: Boolean) {
+        context.audioSettingsDs.edit { it[loudnessNormalizationKey] = enabled }
+    }
+
+    suspend fun setOfflineMode(enabled: Boolean) {
+        context.audioSettingsDs.edit { it[offlineModeKey] = enabled }
     }
 }

@@ -64,6 +64,24 @@ class DirectStreamResolver @Inject constructor(
             throw IOException("Unable to resolve the YouTube audio stream", e)
         }
     }
+
+    suspend fun resolveStreamAsync(originalUri: String): String? {
+        if (!SourceUriPolicy.requiresYouTubeResolution(originalUri)) return originalUri
+        val now = System.currentTimeMillis()
+        val cached = resolvedUrlCache[originalUri]
+        if (cached != null && cached.expiresAtMs > now) {
+            return cached.directUrl
+        }
+        return try {
+            val resolved = extractor.resolveDirectStreamUrl(originalUri)
+            if (resolved.isNotBlank()) {
+                resolvedUrlCache[originalUri] = CachedStreamUrl(resolved, now + 4 * 3600 * 1000L)
+                resolved
+            } else null
+        } catch (_: Exception) {
+            null
+        }
+    }
 }
 
 internal object SourceUriPolicy {

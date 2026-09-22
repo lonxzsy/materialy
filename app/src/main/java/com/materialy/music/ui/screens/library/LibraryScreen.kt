@@ -1,6 +1,10 @@
 package com.materialy.music.ui.screens.library
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -27,6 +31,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
@@ -94,15 +100,21 @@ enum class LibraryFilter {
 class LibraryViewModel @Inject constructor(
     private val repo: MusicRepository,
     private val onlineRepo: OnlineRepository,
+    private val audioSettingsRepo: com.materialy.music.data.audio.AudioSettingsRepository,
     val player: PlayerManager
 ) : ViewModel() {
     val songs = repo.observeSongs().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val playlists = repo.observePlaylistsWithSongs().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val isBackendOnline = onlineRepo.isBackendOnline
+    val isOfflineMode = audioSettingsRepo.offlineModeFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val isPlaying = player.isPlaying
     val currentSong = player.currentSong
     val currentPositionMs = player.currentPositionMs
     val durationMs = player.durationMs
+
+    fun toggleOfflineMode(enabled: Boolean) = viewModelScope.launch {
+        audioSettingsRepo.setOfflineMode(enabled)
+    }
 
     fun addToPlaylist(playlistId: Long, song: SongEntity) = viewModelScope.launch {
         repo.addToPlaylist(playlistId, song)
@@ -128,26 +140,26 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
-    fun playAll(index: Int = 0) {
+    fun playAll(index: Int = 0, songsToPlay: List<SongEntity>? = null) {
         viewModelScope.launch {
-            val list = songs.value
+            val list = songsToPlay ?: songs.value
             if (list.isNotEmpty()) {
                 val safeIdx = index.coerceIn(0, list.size - 1)
                 player.playSongs(list, safeIdx)
             } else {
-                ToastManager.error("Нет треков, доступных без интернета")
+                ToastManager.error("Нет треков для воспроизведения")
             }
         }
     }
 
-    fun shufflePlay() {
+    fun shufflePlay(songsToPlay: List<SongEntity>? = null) {
         viewModelScope.launch {
-            val list = songs.value
+            val list = songsToPlay ?: songs.value
             if (list.isNotEmpty()) {
                 val shuffled = AutoMix.smartShuffle(list)
                 player.playSongs(shuffled, 0)
             } else {
-                ToastManager.error("Нет треков, доступных без интернета")
+                ToastManager.error("Нет треков для воспроизведения")
             }
         }
     }
@@ -191,6 +203,7 @@ fun LibraryScreen(
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
     val songs by viewModel.songs.collectAsState()
+    val isOfflineMode by viewModel.isOfflineMode.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
     val current by viewModel.currentSong.collectAsState()
     val currentPos by viewModel.currentPositionMs.collectAsState()
@@ -202,13 +215,22 @@ fun LibraryScreen(
     var songToDelete by remember { mutableStateOf<SongEntity?>(null) }
     var songForPlaylist by remember { mutableStateOf<SongEntity?>(null) }
 
+    // Effective songs taking into account isOfflineMode
+    val effectiveSongs = remember(songs, isOfflineMode) {
+        if (isOfflineMode) {
+            songs.filter { it.isOfflineAvailable() }
+        } else {
+            songs
+        }
+    }
+
     // Filtered song list
-    val filtered = remember(songs, query, selectedFilter) {
+    val filtered = remember(effectiveSongs, query, selectedFilter) {
         var list = when (selectedFilter) {
-            LibraryFilter.ALL -> songs
-            LibraryFilter.FAVORITES -> songs.filter { it.isFavorite }
-            LibraryFilter.RECENT -> songs.sortedByDescending { it.dateAdded }
-            LibraryFilter.BY_ARTIST -> songs.sortedBy { it.artistName.lowercase() }
+            LibraryFilter.ALL -> effectiveSongs
+            LibraryFilter.FAVORITES -> effectiveSongs.filter { it.isFavorite }
+            LibraryFilter.RECENT -> effectiveSongs.sortedByDescending { it.dateAdded }
+            LibraryFilter.BY_ARTIST -> effectiveSongs.sortedBy { it.artistName.lowercase() }
         }
         if (query.isNotBlank()) {
             list = list.filter {
@@ -221,7 +243,7 @@ fun LibraryScreen(
         list
     }
 
-    val totalDurationMs = remember(songs) { songs.sumOf { it.durationMs } }
+    val totalDurationMs = remember(effectiveSongs) { effectiveSongs.sumOf { it.durationMs } }
     val totalHours = (totalDurationMs / 1000) / 3600
     val totalMins = ((totalDurationMs / 1000) % 3600) / 60
 
@@ -264,11 +286,11 @@ fun LibraryScreen(
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = if (songs.isNotEmpty()) {
+                        text = if (effectiveSongs.isNotEmpty()) {
                             val timeStr = if (totalHours > 0) "${totalHours} ч ${totalMins} мин" else "${totalMins} мин"
-                            "${songs.size} треков • $timeStr звучания"
+                            "${effectiveSongs.size} треков • $timeStr звучания"
                         } else {
-                            "Треков пока нет"
+                            if (isOfflineMode) "Нет сохранённых треков" else "Треков пока нет"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -312,7 +334,7 @@ fun LibraryScreen(
             }
         }
 
-        if (songs.isNotEmpty()) {
+        if (effectiveSongs.isNotEmpty()) {
             Spacer(modifier = Modifier.height(12.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -320,7 +342,7 @@ fun LibraryScreen(
                 ) {
                     Button(
                         onClick = {
-                            viewModel.playAll(0)
+                            viewModel.playAll(0, filtered)
                             ToastManager.playback("Воспроизведение медиатеки")
                             onPlayer()
                         },
@@ -340,7 +362,7 @@ fun LibraryScreen(
 
                     OutlinedButton(
                         onClick = {
-                            viewModel.shufflePlay()
+                            viewModel.shufflePlay(filtered)
                             ToastManager.info("Очередь перемешана")
                             onPlayer()
                         },
@@ -396,15 +418,40 @@ fun LibraryScreen(
         ) {
             item {
                 FilterChip(
-                    selected = selectedFilter == LibraryFilter.ALL,
-                    onClick = { selectedFilter = LibraryFilter.ALL },
-                    label = { Text("Все (${songs.size})") },
+                    selected = isOfflineMode,
+                    onClick = {
+                        val next = !isOfflineMode
+                        viewModel.toggleOfflineMode(next)
+                        if (next) {
+                            ToastManager.info("Режим офлайн: только загруженные треки")
+                        } else {
+                            ToastManager.info("Режим офлайн отключен")
+                        }
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = if (isOfflineMode) Icons.Filled.CloudOff else Icons.Filled.CloudQueue,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = if (isOfflineMode) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    label = { Text("Офлайн") },
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.bouncy()
                 )
             }
             item {
-                val favCount = songs.count { it.isFavorite }
+                FilterChip(
+                    selected = selectedFilter == LibraryFilter.ALL,
+                    onClick = { selectedFilter = LibraryFilter.ALL },
+                    label = { Text("Все (${effectiveSongs.size})") },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.bouncy()
+                )
+            }
+            item {
+                val favCount = effectiveSongs.count { it.isFavorite }
                 FilterChip(
                     selected = selectedFilter == LibraryFilter.FAVORITES,
                     onClick = { selectedFilter = LibraryFilter.FAVORITES },
@@ -441,6 +488,38 @@ fun LibraryScreen(
             }
         }
 
+        AnimatedVisibility(
+            visible = isOfflineMode,
+            enter = fadeIn(spring()) + expandVertically(spring()),
+            exit = fadeOut(spring()) + shrinkVertically(spring())
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CloudOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Режим офлайн: только треки на устройстве",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+        }
+
         // Song List with Smooth Item Placement Animations
         if (filtered.isEmpty()) {
             Box(
@@ -460,7 +539,7 @@ fun LibraryScreen(
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                Icons.Filled.LibraryMusic,
+                                if (isOfflineMode) Icons.Filled.CloudOff else Icons.Filled.LibraryMusic,
                                 contentDescription = null,
                                 modifier = Modifier.size(36.dp),
                                 tint = MaterialTheme.colorScheme.primary
@@ -469,19 +548,31 @@ fun LibraryScreen(
                     }
                     Spacer(modifier = Modifier.height(14.dp))
                     Text(
-                        text = if (query.isNotBlank()) "Ничего не найдено" else "В медиатеке пока пусто",
+                        text = if (query.isNotBlank()) "Ничего не найдено"
+                        else if (isOfflineMode) "Нет сохранённых треков"
+                        else "В медиатеке пока пусто",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = if (query.isNotBlank()) "Попробуйте изменить поисковый запрос"
+                        else if (isOfflineMode) "Включен режим офлайн. Сохраните треки в загрузки или выключите офлайн-режим."
                         else "Найдите музыку через Поиск или откройте список сохранённых загрузок.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
-                    if (query.isBlank()) {
+                    if (isOfflineMode) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = { viewModel.toggleOfflineMode(false) },
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.bouncy()
+                        ) {
+                            Text("Отключить режим офлайн")
+                        }
+                    } else if (query.isBlank()) {
                         Spacer(modifier = Modifier.height(16.dp))
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),

@@ -3,6 +3,7 @@ package com.materialy.music.playback
 import android.content.Context
 import android.media.audiofx.BassBoost
 import android.media.audiofx.Equalizer
+import android.media.audiofx.LoudnessEnhancer
 import android.media.audiofx.Virtualizer
 import android.media.audiofx.Visualizer
 import android.util.Log
@@ -36,6 +37,7 @@ class AudioEffectsManager @Inject constructor(
     private var bassBoost: BassBoost? = null
     private var virtualizer: Virtualizer? = null
     private var visualizer: Visualizer? = null
+    private var loudnessEnhancer: LoudnessEnhancer? = null
     private var currentSessionId: Int = 0
 
     private val _bassEnergy = MutableStateFlow(0.35f)
@@ -57,6 +59,11 @@ class AudioEffectsManager @Inject constructor(
             ) { enabled, bands, bass, virt ->
                 applyEffects(enabled, bands, bass, virt)
             }.collect {}
+        }
+        scope.launch {
+            audioSettingsRepo.loudnessNormalizationFlow.collect { enabled ->
+                applyLoudnessNormalization(enabled)
+            }
         }
         startBeatTicker()
     }
@@ -134,7 +141,11 @@ class AudioEffectsManager @Inject constructor(
             virtualizer = Virtualizer(0, sessionId).apply {
                 enabled = false
             }
-            Log.d(TAG, "Audio effects initialized for session $sessionId")
+            loudnessEnhancer = LoudnessEnhancer(sessionId).apply {
+                setTargetGain(600)
+                enabled = true
+            }
+            Log.d(TAG, "Audio effects and LoudnessEnhancer initialized for session $sessionId")
         } catch (e: Exception) {
             Log.w(TAG, "Hardware audio effects unavailable: ${e.message}")
         }
@@ -259,18 +270,32 @@ class AudioEffectsManager @Inject constructor(
         }
     }
 
+    fun applyLoudnessNormalization(enabled: Boolean) {
+        try {
+            loudnessEnhancer?.apply {
+                setTargetGain(if (enabled) 600 else 0)
+                this.enabled = enabled
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to apply loudness normalization: ${e.message}")
+        }
+    }
+
     fun releaseEffects() {
         beatTickerJob?.cancel()
         try {
             equalizer?.release()
             bassBoost?.release()
             virtualizer?.release()
+            loudnessEnhancer?.enabled = false
+            loudnessEnhancer?.release()
             visualizer?.enabled = false
             visualizer?.release()
         } catch (_: Exception) {}
         equalizer = null
         bassBoost = null
         virtualizer = null
+        loudnessEnhancer = null
         visualizer = null
     }
 }
