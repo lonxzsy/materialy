@@ -11,8 +11,10 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
@@ -104,13 +106,26 @@ fun MiniPlayer(
         enter = slideInVertically(
             initialOffsetY = { it },
             animationSpec = spring(
-                dampingRatio = Spring.DampingRatioLowBouncy,
-                stiffness = Spring.StiffnessLow
+                dampingRatio = 0.82f,
+                stiffness = Spring.StiffnessMediumLow
+            )
+        ) + expandVertically(
+            animationSpec = spring(
+                dampingRatio = 0.82f,
+                stiffness = Spring.StiffnessMediumLow
             )
         ) + fadeIn(tween(220, easing = FastOutSlowInEasing)),
         exit = slideOutVertically(
             targetOffsetY = { it },
-            animationSpec = tween(220, easing = FastOutSlowInEasing)
+            animationSpec = spring(
+                dampingRatio = 0.85f,
+                stiffness = Spring.StiffnessMediumLow
+            )
+        ) + shrinkVertically(
+            animationSpec = spring(
+                dampingRatio = 0.85f,
+                stiffness = Spring.StiffnessMediumLow
+            )
         ) + fadeOut(tween(180))
     ) {
         if (song == null) return@AnimatedVisibility

@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.DownloadForOffline
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.GraphicEq
@@ -524,7 +525,7 @@ private fun DownloadQueuePanel(
                             val icon = when (item.state) {
                                 TrackDownloadState.FAILED -> Icons.Filled.Refresh
                                 TrackDownloadState.QUEUED, TrackDownloadState.DOWNLOADING -> Icons.Filled.Clear
-                                TrackDownloadState.COMPLETED -> Icons.Filled.CheckCircle
+                                TrackDownloadState.COMPLETED -> Icons.Filled.DownloadForOffline
                             }
                             val label = when (item.state) {
                                 TrackDownloadState.FAILED -> "Повторить загрузку"

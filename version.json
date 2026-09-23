@@ -1,6 +1,6 @@
 {
-  "versionCode": 3,
-  "versionName": "1.1.0",
-  "downloadUrl": "https://github.com/lonxzsy/materialy/releases/download/v1.1.0/app-release.apk",
-  "releaseNotes": "Крупное обновление Materialy Music v1.1.0 (Material 3 Expressive & Zero-Gap Engine):\n• Живой органический фон FluidMeshBackground с плавным синусоидальным дрейфом и реакцией на бас (bassEnergy)\n• Переработанный караоке-текст с синхронизацией, эффектом светящегося контейнера и быстрым переходом по тапу (Tap-to-Seek)\n• Бесшовное предзагрузка треков (Zero-Gap Preloading) через ExoPlayer.PreloadConfiguration и упреждающее разрешение потоков\n• Аппаратная нормализация громкости (LoudnessEnhancer) для ровного звучания треков разного уровня\n• Режим офлайн в медиатеке с мгновенным переключением и умными индикаторами локального кэша\n• Живые поисковые подсказки YouTube в реальном времени при вводе запроса\n• Плавное затухание громкости (Fade-out) при срабатывании таймера сна\n• Пружинный слайдер воспроизведения с всплывающим бейджем точного времени"
+  "versionCode": 4,
+  "versionName": "1.1.1",
+  "downloadUrl": "https://github.com/lonxzsy/materialy/releases/download/v1.1.1/app-release.apk",
+  "releaseNotes": "Обновление Materialy Music v1.1.1:\n• Плавное скрытие мини-плеера при скролле вниз по списку (больше не перекрывает нижнюю часть экрана и контент)\n• Мгновенное появление мини-плеера при легком скролле вверх или выборе трека\n• Новая узнаваемая иконка загруженных офлайн-треков (DownloadForOffline) в медиатеке и менеджере загрузок\n• Оптимизация анимаций перехода и пружинных эффектов в Material 3 Expressive"
 }

@@ -39,13 +39,21 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -117,8 +125,40 @@ fun AppNavHost(
         }
     }
 
+    var isMiniPlayerScrolledVisible by remember { mutableStateOf(true) }
+
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val dy = available.y
+                val dx = available.x
+                if (kotlin.math.abs(dy) > kotlin.math.abs(dx)) {
+                    if (dy < -8f) {
+                        isMiniPlayerScrolledVisible = false
+                    } else if (dy > 8f) {
+                        isMiniPlayerScrolledVisible = true
+                    }
+                }
+                return Offset.Zero
+            }
+        }
+    }
+
+    LaunchedEffect(currentRoute) {
+        isMiniPlayerScrolledVisible = true
+    }
+
+    val currentSongForDock by playerViewModel.current.collectAsStateWithLifecycle()
+    LaunchedEffect(currentSongForDock?.songId) {
+        if (currentSongForDock != null) {
+            isMiniPlayerScrolledVisible = true
+        }
+    }
+
     Box(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(nestedScrollConnection)
     ) {
         NavHost(
             navController = nav,
@@ -321,6 +361,7 @@ fun AppNavHost(
             currentRoute = currentRoute,
             tabs = tabItems,
             viewModel = playerViewModel,
+            isMiniPlayerScrolledVisible = isMiniPlayerScrolledVisible,
             onOpenPlayer = ::openPlayer,
             onNavigateToTab = ::navigateToTab,
             modifier = Modifier.align(Alignment.BottomCenter)
@@ -336,6 +377,7 @@ private fun PlayerDock(
     currentRoute: String?,
     tabs: List<Screen>,
     viewModel: PlayerViewModel,
+    isMiniPlayerScrolledVisible: Boolean,
     onOpenPlayer: () -> Unit,
     onNavigateToTab: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -352,7 +394,9 @@ private fun PlayerDock(
         exit = slideOutVertically(targetOffsetY = { it }, animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)) + fadeOut(tween(180))
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            val showMiniPlayer = currentRoute != Screen.Player.route && currentRoute != Screen.MyWave.route
+            val showMiniPlayer = currentRoute != Screen.Player.route &&
+                    currentRoute != Screen.MyWave.route &&
+                    isMiniPlayerScrolledVisible
             MiniPlayer(
                 song = currentSong,
                 isPlaying = isPlaying,
