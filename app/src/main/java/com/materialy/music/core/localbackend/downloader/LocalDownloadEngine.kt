@@ -2,6 +2,7 @@ package com.materialy.music.core.localbackend.downloader
 
 import android.content.Context
 import com.materialy.music.core.localbackend.extractor.InnertubeExtractor
+import com.materialy.music.core.util.FastTrackDownloader
 import com.materialy.music.data.download.DownloadRequest
 import com.materialy.music.data.download.JobStatus
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -10,11 +11,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
-import java.io.FileOutputStream
-import java.io.RandomAccessFile
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -29,9 +29,11 @@ class LocalDownloadEngine @Inject constructor(
     private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val httpClient = OkHttpClient.Builder()
+        .connectionPool(ConnectionPool(16, 5, TimeUnit.MINUTES))
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .followRedirects(true)
+        .retryOnConnectionFailure(true)
         .build()
 
     private val jobs = ConcurrentHashMap<String, LocalJobState>()
@@ -74,161 +76,43 @@ class LocalDownloadEngine @Inject constructor(
                     else -> "opus"
                 }
 
-                val streamUrl = extractor.resolveDirectStreamUrl(req.url, req.formatId)
+                val stream = extractor.resolveStream(req.url, req.formatId)
                 jobState.progress = 0.15f
 
                 // Clean filename
                 val safeTitle = sanitizeFilename(info.title)
                 val safeArtist = sanitizeFilename(info.uploader)
-                val outFilename = "$safeArtist - $safeTitle.$targetExt"
                 val destinationFile = File(downloadsDir, "$jobId.$targetExt")
                 if (destinationFile.exists()) destinationFile.delete()
 
-                // 2. Determine file length from format info or HEAD request
-                val selectedFmt = info.formats.firstOrNull { it.formatId == req.formatId } ?: info.formats.firstOrNull()
-                var totalLength = selectedFmt?.filesize ?: 0L
-
-                if (totalLength <= 0L) {
-                    try {
-                        val headReq = Request.Builder()
-                            .url(streamUrl)
-                            .head()
-                            .addHeader("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15")
-                            .build()
-                        val headResp = httpClient.newCall(headReq).execute()
-                        val cl = headResp.header("Content-Length")?.toLongOrNull() ?: 0L
-                        if (cl > 0) totalLength = cl
-                        headResp.close()
-                    } catch (_: Exception) {}
+                val result = FastTrackDownloader.download(
+                    client = httpClient,
+                    url = stream.url,
+                    destinationFile = destinationFile,
+                    knownTotalLength = stream.contentLength,
+                    knownMimeType = stream.mimeType
+                ) { progressInfo ->
+                    jobState.speed = progressInfo.speedFormatted
+                    jobState.eta = progressInfo.etaFormatted
+                    val rawProg = 0.15f + (progressInfo.percent.toFloat() / 100f) * 0.80f
+                    jobState.progress = rawProg.coerceIn(0.15f, 0.98f)
+                    jobState.filesize = progressInfo.totalBytes
                 }
 
-                jobState.filesize = if (totalLength > 0) totalLength else null
-
-                val userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
-
-                // 3. Fast unthrottled chunked Range downloading (512 KB chunks)
-                if (totalLength > 0) {
-                    val raf = RandomAccessFile(destinationFile, "rw")
-                    val chunkSize = 512 * 1024L // 512 KB chunks
-                    var startByte = 0L
-                    var downloadedBytes = 0L
-                    var lastTime = System.currentTimeMillis()
-                    var lastBytes = 0L
-
-                    while (startByte < totalLength) {
-                        val endByte = minOf(startByte + chunkSize - 1, totalLength - 1)
-                        val rangeHeader = "bytes=$startByte-$endByte"
-
-                        val chunkReq = Request.Builder()
-                            .url(streamUrl)
-                            .addHeader("User-Agent", userAgent)
-                            .addHeader("Range", rangeHeader)
-                            .addHeader("Accept", "*/*")
-                            .addHeader("Accept-Encoding", "identity")
-                            .addHeader("Connection", "keep-alive")
-                            .build()
-
-                        val chunkResp = httpClient.newCall(chunkReq).execute()
-                        if (!chunkResp.isSuccessful && chunkResp.code != 206) {
-                            chunkResp.close()
-                            throw IllegalStateException("Ошибка загрузки фрагмента: HTTP ${chunkResp.code}")
-                        }
-
-                        val chunkBody = chunkResp.body ?: throw IllegalStateException("Пустой ответ от сервера")
-                        val bytes = chunkBody.bytes()
-                        raf.seek(startByte)
-                        raf.write(bytes)
-                        chunkResp.close()
-
-                        downloadedBytes += bytes.size
-                        startByte = endByte + 1
-
-                        val now = System.currentTimeMillis()
-                        val durationSec = (now - lastTime) / 1000.0
-                        if (durationSec >= 0.3 || startByte >= totalLength) {
-                            val bytesInPeriod = downloadedBytes - lastBytes
-                            val bytesPerSec = if (durationSec > 0) (bytesInPeriod / durationSec).toLong() else 0L
-                            jobState.speed = formatSpeed(bytesPerSec)
-
-                            val rawProg = 0.15f + (downloadedBytes.toFloat() / totalLength.toFloat()) * 0.80f
-                            jobState.progress = rawProg.coerceIn(0.15f, 0.98f)
-
-                            val remBytes = totalLength - downloadedBytes
-                            if (bytesPerSec > 0) {
-                                val etaSec = remBytes / bytesPerSec
-                                jobState.eta = String.format("%02d:%02d", etaSec / 60, etaSec % 60)
-                            }
-
-                            lastTime = now
-                            lastBytes = downloadedBytes
-                        }
-                    }
-
-                    raf.close()
+                val finalExt = result.suggestedExt
+                val finalFile = if (finalExt != targetExt) {
+                    val renamed = File(downloadsDir, "$jobId.$finalExt")
+                    if (renamed.exists()) renamed.delete()
+                    if (destinationFile.renameTo(renamed)) renamed else destinationFile
                 } else {
-                    // Sequential fallback with larger 128KB buffer
-                    val downloadRequest = Request.Builder()
-                        .url(streamUrl)
-                        .addHeader("User-Agent", userAgent)
-                        .addHeader("Accept", "*/*")
-                        .build()
-
-                    val response = httpClient.newCall(downloadRequest).execute()
-                    if (!response.isSuccessful) {
-                        throw IllegalStateException("Ошибка загрузки потока: HTTP ${response.code}")
-                    }
-
-                    val body = response.body ?: throw IllegalStateException("Пустой поток данных")
-                    val cl = body.contentLength()
-                    if (cl > 0) totalLength = cl
-                    jobState.filesize = totalLength
-
-                    val inputStream = body.byteStream()
-                    val outputStream = FileOutputStream(destinationFile)
-                    val buffer = ByteArray(128 * 1024)
-                    var bytesRead: Int
-                    var totalBytesRead = 0L
-                    var lastTime = System.currentTimeMillis()
-                    var lastBytes = 0L
-
-                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                        outputStream.write(buffer, 0, bytesRead)
-                        totalBytesRead += bytesRead
-
-                        val now = System.currentTimeMillis()
-                        if (now - lastTime >= 300) {
-                            val durationSec = (now - lastTime) / 1000.0
-                            val bytesInPeriod = totalBytesRead - lastBytes
-                            val bytesPerSec = if (durationSec > 0) (bytesInPeriod / durationSec).toLong() else 0L
-                            jobState.speed = formatSpeed(bytesPerSec)
-
-                            if (totalLength > 0) {
-                                val rawProgress = 0.15f + (totalBytesRead.toFloat() / totalLength.toFloat()) * 0.80f
-                                jobState.progress = rawProgress.coerceIn(0.15f, 0.98f)
-
-                                val remainingBytes = totalLength - totalBytesRead
-                                if (bytesPerSec > 0) {
-                                    val etaSeconds = remainingBytes / bytesPerSec
-                                    jobState.eta = String.format("%02d:%02d", etaSeconds / 60, etaSeconds % 60)
-                                }
-                            } else {
-                                jobState.progress = (jobState.progress + 0.05f).coerceAtMost(0.92f)
-                            }
-
-                            lastTime = now
-                            lastBytes = totalBytesRead
-                        }
-                    }
-
-                    outputStream.flush()
-                    outputStream.close()
-                    inputStream.close()
+                    destinationFile
                 }
+                val outFilename = "$safeArtist - $safeTitle.$finalExt"
 
                 jobState.progress = 1.0f
                 jobState.status = "completed"
                 jobState.filename = outFilename
-                jobState.localFile = destinationFile
+                jobState.localFile = finalFile
                 jobState.speed = null
                 jobState.eta = null
             } catch (e: Exception) {

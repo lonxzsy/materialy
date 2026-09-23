@@ -12,12 +12,14 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.materialy.music.core.localbackend.extractor.InnertubeExtractor
+import com.materialy.music.core.util.FastTrackDownloader
 import com.materialy.music.core.util.MetadataExtractor
 import com.materialy.music.data.db.AppDatabase
 import com.materialy.music.data.db.Migrations
 import com.materialy.music.data.db.entity.SongEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -39,9 +41,11 @@ class DownloadWorker(
 
     private val client by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
+            .connectionPool(ConnectionPool(16, 5, TimeUnit.MINUTES))
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
             .followRedirects(true)
+            .retryOnConnectionFailure(true)
             .build()
     }
 
@@ -76,19 +80,26 @@ class DownloadWorker(
                 }
             }
 
+            var downloadUrl = ""
+            var resolvedLength = 0L
+            var resolvedMime: String? = null
+
             // 2. Resolve actual audio stream URL if not a direct local file or CDN URL
-            val downloadUrl: String = if (directFile == null) {
+            if (directFile == null) {
                 if (rawFileUrl.contains("googlevideo.com") || rawFileUrl.contains("sndcdn.com") || rawFileUrl.startsWith("http://127.0.0.1")) {
-                    rawFileUrl
+                    downloadUrl = rawFileUrl
                 } else {
-                    setProgress(workDataOf("progress" to 10, "status" to "Получение прямой аудио-ссылки..."))
+                    setProgress(workDataOf("progress" to 10, "status" to "Получение аудио-потока..."))
                     try {
-                        extractor.resolveDirectStreamUrl(rawFileUrl)
+                        val stream = extractor.resolveStream(rawFileUrl)
+                        downloadUrl = stream.url
+                        resolvedLength = stream.contentLength
+                        resolvedMime = stream.mimeType
                     } catch (e: Exception) {
                         return@withContext Result.failure(workDataOf("error" to "Не удалось извлечь аудио: ${e.message}"))
                     }
                 }
-            } else ""
+            }
 
             // Determine final extension
             var finalExt = when (requestedExt.lowercase().trimStart('.')) {
@@ -108,41 +119,35 @@ class DownloadWorker(
                 setProgress(workDataOf("progress" to 50, "status" to "Сохранение трека..."))
                 directFile.copyTo(targetAudioFile, overwrite = true)
             } else {
-                setProgress(workDataOf("progress" to 15, "status" to "Скачивание аудио..."))
-                val req = Request.Builder()
-                    .url(downloadUrl)
-                    .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-                    .build()
-                val resp = client.newCall(req).execute()
-                if (!resp.isSuccessful) {
-                    return@withContext Result.failure(workDataOf("error" to "Ошибка сервера: HTTP ${resp.code}"))
-                }
-                val body = resp.body ?: return@withContext Result.failure(workDataOf("error" to "Пустой ответ от сервера"))
-                val total = body.contentLength()
+                setProgress(workDataOf("progress" to 15, "status" to "Быстрое скачивание..."))
 
-                // Check content-type to ensure matching extension
-                val contentType = resp.header("Content-Type")?.lowercase() ?: ""
-                if (contentType.contains("webm") || contentType.contains("opus")) {
-                    finalExt = "opus"
-                } else if (contentType.contains("mp4") || contentType.contains("m4a") || contentType.contains("aac")) {
-                    finalExt = "m4a"
-                } else if (contentType.contains("mpeg") || contentType.contains("mp3")) {
-                    finalExt = "mp3"
+                var lastProgressTime = 0L
+                var lastProgressVal = -1
+
+                val result = FastTrackDownloader.download(
+                    client = client,
+                    url = downloadUrl,
+                    destinationFile = targetAudioFile,
+                    knownTotalLength = resolvedLength,
+                    knownMimeType = resolvedMime
+                ) { info ->
+                    val now = System.currentTimeMillis()
+                    val p = 15 + ((info.percent * 75) / 100).coerceIn(0, 75)
+                    if (p != lastProgressVal && (p == 90 || now - lastProgressTime >= 350L)) {
+                        lastProgressVal = p
+                        lastProgressTime = now
+                        setProgressAsync(workDataOf(
+                            "progress" to p,
+                            "status" to "Скачивание: ${info.percent}% (${info.speedFormatted})"
+                        ))
+                    }
                 }
 
-                FileOutputStream(targetAudioFile).use { out ->
-                    body.byteStream().use { input ->
-                        val buf = ByteArray(32768)
-                        var read: Int
-                        var done = 0L
-                        while (input.read(buf).also { read = it } != -1) {
-                            out.write(buf, 0, read)
-                            done += read
-                            if (total > 0) {
-                                val p = 15 + ((done * 75) / total).toInt().coerceIn(0, 75)
-                                setProgress(workDataOf("progress" to p))
-                            }
-                        }
+                if (result.suggestedExt != finalExt) {
+                    val renamed = File(musicDir, "$sanitizedArtist - $sanitizedTitle.${result.suggestedExt}")
+                    if (renamed.exists()) renamed.delete()
+                    if (targetAudioFile.renameTo(renamed)) {
+                        finalExt = result.suggestedExt
                     }
                 }
             }

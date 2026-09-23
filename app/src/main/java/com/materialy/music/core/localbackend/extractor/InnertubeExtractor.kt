@@ -422,23 +422,34 @@ class InnertubeExtractor @Inject constructor() {
         )
     }
 
+data class ResolvedStream(
+    val url: String,
+    val contentLength: Long = 0L,
+    val mimeType: String = "audio/mp4",
+    val itag: String? = null
+)
+
     /**
-     * Resolve direct stream audio URL for playing online or downloading
+     * Resolve direct stream audio URL and metadata for playing online or downloading
      */
-    suspend fun resolveDirectStreamUrl(urlOrId: String, preferredFormat: String? = null): String = withContext(Dispatchers.IO) {
+    suspend fun resolveStream(urlOrId: String, preferredFormat: String? = null): ResolvedStream = withContext(Dispatchers.IO) {
         val videoId = extractVideoId(urlOrId) ?: urlOrId
 
         // 1. Try VISIONOS
         val visionData = fetchVisionOsPayload(videoId)
-        var streamUrl = extractBestStreamUrl(visionData, preferredFormat)
+        var stream = extractBestStream(visionData, preferredFormat)
 
         // 2. Try ANDROID_VR
-        if (streamUrl == null) {
+        if (stream == null) {
             val vrData = fetchAndroidVrPayload(videoId)
-            streamUrl = extractBestStreamUrl(vrData, preferredFormat)
+            stream = extractBestStream(vrData, preferredFormat)
         }
 
-        streamUrl ?: throw IllegalStateException("Не удалось получить прямую аудио-ссылку для $videoId")
+        stream ?: throw IllegalStateException("Не удалось получить прямую аудио-ссылку для $videoId")
+    }
+
+    suspend fun resolveDirectStreamUrl(urlOrId: String, preferredFormat: String? = null): String {
+        return resolveStream(urlOrId, preferredFormat).url
     }
 
     /**
@@ -600,7 +611,7 @@ class InnertubeExtractor @Inject constructor() {
         }
     }
 
-    private fun extractBestStreamUrl(playerData: JsonObject?, preferredFormat: String?): String? {
+    private fun extractBestStream(playerData: JsonObject?, preferredFormat: String?): ResolvedStream? {
         val streamingData = playerData?.get("streamingData")?.jsonObject ?: return null
         val adaptiveFormats = streamingData["adaptiveFormats"]?.jsonArray ?: return null
 
@@ -618,9 +629,23 @@ class InnertubeExtractor @Inject constructor() {
         val best = matched ?: audioFormats.firstOrNull { it["itag"]?.jsonPrimitive?.contentOrNull == "251" }
             ?: audioFormats.firstOrNull { it["itag"]?.jsonPrimitive?.contentOrNull == "140" }
             ?: audioFormats.maxByOrNull { it["bitrate"]?.jsonPrimitive?.intOrNull ?: 0 }
-            ?: audioFormats.firstOrNull()
+            ?: audioFormats.firstOrNull() ?: return null
 
-        return best?.get("url")?.jsonPrimitive?.contentOrNull
+        val url = best["url"]?.jsonPrimitive?.contentOrNull ?: return null
+        val cl = best["contentLength"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 0L
+        val mime = best["mimeType"]?.jsonPrimitive?.contentOrNull ?: "audio/mp4"
+        val itag = best["itag"]?.jsonPrimitive?.contentOrNull
+
+        return ResolvedStream(
+            url = url,
+            contentLength = cl,
+            mimeType = mime,
+            itag = itag
+        )
+    }
+
+    private fun extractBestStreamUrl(playerData: JsonObject?, preferredFormat: String?): String? {
+        return extractBestStream(playerData, preferredFormat)?.url
     }
 
     private fun findVideoRenderers(element: JsonElement, results: MutableList<SearchResultItem>, limit: Int) {
