@@ -93,6 +93,13 @@ class SettingsViewModel @Inject constructor(
     val smoothAudioDurationMs = audioSettingsRepo.smoothAudioDurationMsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 2000L)
 
+    // Absolute Volume (Hardware Gain Boost)
+    val absoluteVolumeEnabled = audioSettingsRepo.absoluteVolumeEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val absoluteVolumeBoostDb = audioSettingsRepo.absoluteVolumeBoostDbFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 6)
+
     init {
         viewModelScope.launch {
             downloadRepo.serverUrlFlow.collect { url ->
@@ -169,6 +176,16 @@ class SettingsViewModel @Inject constructor(
 
     fun setSmoothAudioDurationMs(durationMs: Long) = viewModelScope.launch {
         audioSettingsRepo.setSmoothAudioDurationMs(durationMs)
+    }
+
+    fun setAbsoluteVolumeEnabled(enabled: Boolean) = viewModelScope.launch {
+        audioSettingsRepo.setAbsoluteVolumeEnabled(enabled)
+        val msg = if (enabled) "Абсолютная громкость включена" else "Абсолютная громкость отключена"
+        ToastManager.info(msg)
+    }
+
+    fun setAbsoluteVolumeBoostDb(boostDb: Int) = viewModelScope.launch {
+        audioSettingsRepo.setAbsoluteVolumeBoostDb(boostDb)
     }
 
     fun clearOnlineHistory() = viewModelScope.launch {

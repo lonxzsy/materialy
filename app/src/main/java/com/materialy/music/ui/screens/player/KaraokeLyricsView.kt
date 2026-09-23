@@ -1,7 +1,9 @@
 package com.materialy.music.ui.screens.player
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -35,8 +37,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -98,9 +101,12 @@ fun KaraokeLyricsView(
     // Smooth spring auto-scroll to keep active line centered in focus zone
     LaunchedEffect(activeIndex) {
         if (activeIndex in lyrics.indices) {
+            val visibleInfo = listState.layoutInfo
+            val viewportHeight = visibleInfo.viewportSize.height
+            val offset = if (viewportHeight > 0) -(viewportHeight / 3) else -220
             listState.animateScrollToItem(
                 index = activeIndex.coerceAtLeast(0),
-                scrollOffset = -220
+                scrollOffset = offset
             )
         }
     }
@@ -109,7 +115,7 @@ fun KaraokeLyricsView(
         state = listState,
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 90.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         itemsIndexed(lyrics, key = { index, item -> "${index}_${item.timestampMs}" }) { index, line ->
             val isActive = index == activeIndex
@@ -123,37 +129,62 @@ fun KaraokeLyricsView(
             }
             val alpha by animateFloatAsState(
                 targetValue = targetAlpha,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessMediumLow
-                ),
+                animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
                 label = "lyricsAlpha"
             )
 
-            val targetScale = if (isActive) 1.035f else 1.0f
+            val targetScale = if (isActive) 1.035f else 0.985f
             val scale by animateFloatAsState(
                 targetValue = targetScale,
                 animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow
+                    dampingRatio = 0.82f,
+                    stiffness = Spring.StiffnessMediumLow
                 ),
                 label = "lyricsScale"
             )
 
             val textColor by animateColorAsState(
-                targetValue = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                animationSpec = tween(260),
+                targetValue = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+                animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
                 label = "lyricsColor"
+            )
+
+            val containerColor by animateColorAsState(
+                targetValue = if (isActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f) else Color.Transparent,
+                animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
+                label = "lyricsBgColor"
+            )
+
+            val barWidth by animateDpAsState(
+                targetValue = if (isActive) 4.dp else 0.dp,
+                animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow),
+                label = "indicatorWidth"
+            )
+
+            val barAlpha by animateFloatAsState(
+                targetValue = if (isActive) 1f else 0f,
+                animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+                label = "indicatorAlpha"
+            )
+
+            val barSpacing by animateDpAsState(
+                targetValue = if (isActive) 12.dp else 0.dp,
+                animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow),
+                label = "indicatorSpacing"
             )
 
             Surface(
                 shape = RoundedCornerShape(18.dp),
-                color = if (isActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.32f) else Color.Transparent,
+                color = containerColor,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .scale(scale)
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        transformOrigin = TransformOrigin(0f, 0.5f)
+                    }
                     .alpha(alpha)
-                    .bouncy(scaleDown = 0.97f)
+                    .bouncy(scaleDown = 0.98f)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
@@ -165,20 +196,21 @@ fun KaraokeLyricsView(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (isActive) {
+                    if (barWidth > 0.dp || barAlpha > 0f) {
                         Box(
                             modifier = Modifier
-                                .size(width = 4.dp, height = 24.dp)
+                                .size(width = barWidth, height = 24.dp)
                                 .clip(RoundedCornerShape(2.dp))
+                                .alpha(barAlpha)
                                 .background(MaterialTheme.colorScheme.primary)
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(barSpacing))
                     }
                     Text(
                         text = line.text,
                         style = MaterialTheme.typography.headlineSmall.copy(
-                            fontSize = if (isActive) 23.sp else 19.sp,
-                            lineHeight = if (isActive) 32.sp else 26.sp
+                            fontSize = 21.sp,
+                            lineHeight = 29.sp
                         ),
                         fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
                         color = textColor,

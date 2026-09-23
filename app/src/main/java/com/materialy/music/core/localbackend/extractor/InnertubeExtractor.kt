@@ -575,7 +575,7 @@ class InnertubeExtractor @Inject constructor() {
         }
     }
 
-    private suspend fun fetchOEmbed(videoId: String): Pair<String, String>? = withContext(Dispatchers.IO) {
+    suspend fun fetchOEmbed(videoId: String): Pair<String, String>? = withContext(Dispatchers.IO) {
         try {
             val req = Request.Builder()
                 .url("https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=$videoId&format=json")
@@ -692,12 +692,14 @@ class InnertubeExtractor @Inject constructor() {
         }
     }
 
-    private fun extractVideoId(url: String): String? {
-        val clean = url.trim()
-        if (clean.length == 11 && !clean.contains("/") && !clean.contains("?")) return clean
-        val ytRegex = Regex("""(?:v=|youtu\.be/|embed/|shorts/|watch\?v=|\?v=)([a-zA-Z0-9_-]{11})""")
-        val match = ytRegex.find(clean)
-        return match?.groupValues?.get(1)
+    companion object {
+        fun extractVideoId(url: String): String? {
+            val clean = url.trim()
+            if (clean.length == 11 && !clean.contains("/") && !clean.contains("?")) return clean
+            val ytRegex = Regex("""(?:v=|youtu\.be/|embed/|shorts/|watch\?v=|\?v=)([a-zA-Z0-9_-]{11})""")
+            val match = ytRegex.find(clean)
+            return match?.groupValues?.get(1)
+        }
     }
 
     private fun escapeJson(str: String): String {

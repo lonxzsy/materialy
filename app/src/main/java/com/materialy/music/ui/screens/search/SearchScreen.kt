@@ -278,13 +278,19 @@ fun SearchScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = 12.dp)
                 ) {
-                    items(recentSearches) { queryItem ->
+                    items(recentSearches, key = { it.query }) { item ->
                         InputChip(
                             selected = false,
                             onClick = {
-                                viewModel.performSearch(queryItem)
+                                viewModel.performSearch(item.query)
                             },
-                            label = { Text(queryItem) },
+                            label = {
+                                Text(
+                                    text = item.displayTitle,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
                             trailingIcon = {
                                 Icon(
                                     imageVector = Icons.Filled.Clear,
@@ -292,7 +298,7 @@ fun SearchScreen(
                                     modifier = Modifier
                                         .size(14.dp)
                                         .clickable {
-                                            viewModel.removeRecentSearch(queryItem)
+                                            viewModel.removeRecentSearch(item.query)
                                         }
                                 )
                             },

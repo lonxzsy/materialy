@@ -41,8 +41,7 @@ class HomeViewModel @Inject constructor(
 
     val waveState: StateFlow<MyWaveState> = myWaveRepo.waveState
 
-    val recentSearches: StateFlow<List<String>> = searchHistoryRepo.recentQueries
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val recentSearches: StateFlow<List<com.materialy.music.data.repository.SearchHistoryEntry>> = searchHistoryRepo.recentEntries
 
     val isPlaying: StateFlow<Boolean> = player.isPlaying
     val currentSong: StateFlow<SongEntity?> = player.currentSong
@@ -292,12 +291,17 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                val results = extractor.search("$query радио микс", limit = 15).map {
+                val videoId = InnertubeExtractor.extractVideoId(query)
+                val results = if (videoId != null) {
+                    extractor.search(query, limit = 10)
+                } else {
+                    extractor.search("$query радио микс", limit = 15)
+                }.map {
                     SongEntity(
                         songId = ContentId(ContentProvider.YOUTUBE, ContentType.TRACK, it.id).legacySongId(),
                         title = it.title,
                         artistName = it.uploader,
-                        albumName = "Поиск: $query",
+                        albumName = if (videoId != null) "YouTube" else "Поиск: $query",
                         durationMs = it.duration * 1000L,
                         artworkPath = it.thumbnail,
                         fileUri = it.url,
@@ -306,6 +310,9 @@ class HomeViewModel @Inject constructor(
                     )
                 }
                 if (results.isNotEmpty()) {
+                    if (videoId != null) {
+                        searchHistoryRepo.updateDisplayTitle(query, results[0].title)
+                    }
                     player.playSongs(results, 0)
                 }
             } catch (_: Exception) {

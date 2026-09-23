@@ -236,13 +236,13 @@ fun HomeScreen(
                             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(recentSearches.take(6)) { query ->
+                            items(recentSearches.take(6), key = { it.query }) { item ->
                                 AssistChip(
                                     onClick = {
-                                        viewModel.playSearchQuery(query)
+                                        viewModel.playSearchQuery(item.query)
                                         onNavigateToPlayer()
                                     },
-                                    label = { Text(query, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                    label = { Text(item.displayTitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                                     shape = RoundedCornerShape(12.dp),
                                     colors = AssistChipDefaults.assistChipColors(
                                         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh

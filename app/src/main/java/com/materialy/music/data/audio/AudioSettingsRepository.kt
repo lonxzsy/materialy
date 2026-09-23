@@ -54,6 +54,8 @@ class AudioSettingsRepository @Inject constructor(
     private val smoothAudioEnabledKey = booleanPreferencesKey("smooth_audio_enabled")
     private val smoothAudioDurationMsKey = longPreferencesKey("smooth_audio_duration_ms")
     private val loudnessNormalizationKey = booleanPreferencesKey("loudness_normalization_enabled")
+    private val absoluteVolumeEnabledKey = booleanPreferencesKey("absolute_volume_enabled")
+    private val absoluteVolumeBoostDbKey = intPreferencesKey("absolute_volume_boost_db")
     private val offlineModeKey = booleanPreferencesKey("offline_mode_enabled")
 
     val equalizerEnabledFlow: Flow<Boolean> = context.audioSettingsDs.data.map { it[equalizerEnabledKey] ?: false }
@@ -74,6 +76,8 @@ class AudioSettingsRepository @Inject constructor(
     val smoothAudioEnabledFlow: Flow<Boolean> = context.audioSettingsDs.data.map { it[smoothAudioEnabledKey] ?: true }
     val smoothAudioDurationMsFlow: Flow<Long> = context.audioSettingsDs.data.map { it[smoothAudioDurationMsKey] ?: 2000L }
     val loudnessNormalizationFlow: Flow<Boolean> = context.audioSettingsDs.data.map { it[loudnessNormalizationKey] ?: true }
+    val absoluteVolumeEnabledFlow: Flow<Boolean> = context.audioSettingsDs.data.map { it[absoluteVolumeEnabledKey] ?: false }
+    val absoluteVolumeBoostDbFlow: Flow<Int> = context.audioSettingsDs.data.map { it[absoluteVolumeBoostDbKey] ?: 6 }
     val offlineModeFlow: Flow<Boolean> = context.audioSettingsDs.data.map { it[offlineModeKey] ?: false }
 
     suspend fun setEqualizerEnabled(enabled: Boolean) {
@@ -146,6 +150,14 @@ class AudioSettingsRepository @Inject constructor(
 
     suspend fun setLoudnessNormalization(enabled: Boolean) {
         context.audioSettingsDs.edit { it[loudnessNormalizationKey] = enabled }
+    }
+
+    suspend fun setAbsoluteVolumeEnabled(enabled: Boolean) {
+        context.audioSettingsDs.edit { it[absoluteVolumeEnabledKey] = enabled }
+    }
+
+    suspend fun setAbsoluteVolumeBoostDb(boostDb: Int) {
+        context.audioSettingsDs.edit { it[absoluteVolumeBoostDbKey] = boostDb.coerceIn(1, 15) }
     }
 
     suspend fun setOfflineMode(enabled: Boolean) {

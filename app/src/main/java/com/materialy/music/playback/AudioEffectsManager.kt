@@ -49,6 +49,10 @@ class AudioEffectsManager @Inject constructor(
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var fadeJob: Job? = null
 
+    private var lastNormEnabled = true
+    private var lastAbsVolumeEnabled = false
+    private var lastBoostDb = 6
+
     init {
         scope.launch {
             combine(
@@ -61,9 +65,16 @@ class AudioEffectsManager @Inject constructor(
             }.collect {}
         }
         scope.launch {
-            audioSettingsRepo.loudnessNormalizationFlow.collect { enabled ->
-                applyLoudnessNormalization(enabled)
-            }
+            combine(
+                audioSettingsRepo.loudnessNormalizationFlow,
+                audioSettingsRepo.absoluteVolumeEnabledFlow,
+                audioSettingsRepo.absoluteVolumeBoostDbFlow
+            ) { norm, absEnabled, boostDb ->
+                lastNormEnabled = norm
+                lastAbsVolumeEnabled = absEnabled
+                lastBoostDb = boostDb
+                updateLoudnessGain(norm, absEnabled, boostDb)
+            }.collect {}
         }
         startBeatTicker()
     }
@@ -142,8 +153,11 @@ class AudioEffectsManager @Inject constructor(
                 enabled = false
             }
             loudnessEnhancer = LoudnessEnhancer(sessionId).apply {
-                setTargetGain(600)
-                enabled = true
+                val baseGainMb = if (lastNormEnabled) 500 else 0
+                val boostGainMb = if (lastAbsVolumeEnabled) (lastBoostDb.coerceIn(1, 15) * 100) else 0
+                val totalGainMb = baseGainMb + boostGainMb
+                setTargetGain(totalGainMb)
+                enabled = lastNormEnabled || lastAbsVolumeEnabled
             }
             Log.d(TAG, "Audio effects and LoudnessEnhancer initialized for session $sessionId")
         } catch (e: Exception) {
@@ -270,15 +284,32 @@ class AudioEffectsManager @Inject constructor(
         }
     }
 
-    fun applyLoudnessNormalization(enabled: Boolean) {
+    private fun updateLoudnessGain(normEnabled: Boolean, absVolumeEnabled: Boolean, boostDb: Int) {
         try {
+            val baseGainMb = if (normEnabled) 500 else 0
+            val boostGainMb = if (absVolumeEnabled) (boostDb.coerceIn(1, 15) * 100) else 0
+            val totalGainMb = baseGainMb + boostGainMb
+            val shouldEnable = normEnabled || absVolumeEnabled
+
             loudnessEnhancer?.apply {
-                setTargetGain(if (enabled) 600 else 0)
-                this.enabled = enabled
+                setTargetGain(totalGainMb)
+                this.enabled = shouldEnable
             }
+            Log.d(TAG, "LoudnessEnhancer updated: gain=${totalGainMb}mB, enabled=$shouldEnable")
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to apply loudness normalization: ${e.message}")
+            Log.w(TAG, "Failed to apply loudness gain: ${e.message}")
         }
+    }
+
+    fun applyLoudnessNormalization(enabled: Boolean) {
+        lastNormEnabled = enabled
+        updateLoudnessGain(enabled, lastAbsVolumeEnabled, lastBoostDb)
+    }
+
+    fun applyAbsoluteVolume(enabled: Boolean, boostDb: Int = lastBoostDb) {
+        lastAbsVolumeEnabled = enabled
+        lastBoostDb = boostDb
+        updateLoudnessGain(lastNormEnabled, enabled, boostDb)
     }
 
     fun releaseEffects() {

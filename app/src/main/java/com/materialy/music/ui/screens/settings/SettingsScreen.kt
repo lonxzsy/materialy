@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bookmark
@@ -122,6 +123,12 @@ fun SettingsScreen(
     // Smooth Audio State
     val smoothAudioEnabled by viewModel.smoothAudioEnabled.collectAsState()
     val smoothAudioDurationMs by viewModel.smoothAudioDurationMs.collectAsState()
+
+    // Absolute Volume State
+    val absoluteVolumeEnabled by viewModel.absoluteVolumeEnabled.collectAsState()
+    val absoluteVolumeBoostDb by viewModel.absoluteVolumeBoostDb.collectAsState()
+    var showAbsoluteVolumeWarningDialog by remember { mutableStateOf(false) }
+
     val updateState by viewModel.updateState.collectAsState()
 
     var inputUrl by remember(customServerUrl) { mutableStateOf(customServerUrl) }
@@ -483,6 +490,111 @@ fun SettingsScreen(
                                         text = "• Crossfade: плавное перетекание при переключении следующего/предыдущего трека",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // SECTION: Absolute Volume (Hardware Gain Boost)
+            item {
+                SettingsSectionCard(
+                    title = "Абсолютная громкость",
+                    icon = Icons.AutoMirrored.Filled.VolumeUp,
+                    badge = if (absoluteVolumeEnabled) "+$absoluteVolumeBoostDb дБ" else "ВЫКЛ",
+                    badgeColor = if (absoluteVolumeEnabled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Усиление звука сверх максимума",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Позволяет поднять громкость выше 100% системного лимита через аппаратный усилитель LoudnessEnhancer",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Switch(
+                            checked = absoluteVolumeEnabled,
+                            onCheckedChange = { checked ->
+                                if (checked) {
+                                    showAbsoluteVolumeWarningDialog = true
+                                } else {
+                                    viewModel.setAbsoluteVolumeEnabled(false)
+                                }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MaterialTheme.colorScheme.onError,
+                                checkedTrackColor = MaterialTheme.colorScheme.error
+                            ),
+                            modifier = Modifier.bouncy()
+                        )
+                    }
+
+                    AnimatedVisibility(visible = absoluteVolumeEnabled) {
+                        Column(modifier = Modifier.padding(top = 14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Дополнительное усиление:",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = "+$absoluteVolumeBoostDb дБ",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+
+                            Slider(
+                                value = absoluteVolumeBoostDb.toFloat(),
+                                onValueChange = { viewModel.setAbsoluteVolumeBoostDb(it.toInt()) },
+                                valueRange = 2f..12f,
+                                steps = 9,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = SliderDefaults.colors(
+                                    thumbColor = MaterialTheme.colorScheme.error,
+                                    activeTrackColor = MaterialTheme.colorScheme.error
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Info,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = "Внимание: Высокая громкость может нанести непоправимый вред слуху или вызвать перегрузку динамиков. Используйте с осторожностью для тихих записей.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
                                     )
                                 }
                             }
@@ -883,6 +995,57 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showClearOnlineConfirm = false }, modifier = Modifier.bouncy()) {
+                    Text("Отмена")
+                }
+            },
+            shape = RoundedCornerShape(24.dp)
+        )
+    }
+
+    if (showAbsoluteVolumeWarningDialog) {
+        AlertDialog(
+            onDismissRequest = { showAbsoluteVolumeWarningDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.VolumeUp,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Предупреждение о здоровье слуха", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Text(
+                    "Включение «Абсолютной громкости» усиливает звуковой сигнал сверх стандартного системного максимума Android.\n\n" +
+                    "⚠️ Длительное прослушивание аудио на сверхвысокой громкости может привести к необратимой потере слуха, а также к хрипу и повреждению динамиков устройства или наушников.\n\n" +
+                    "Используйте эту функцию только для очень тихих дорожек. Вы подтверждаете включение?"
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.setAbsoluteVolumeEnabled(true)
+                        showAbsoluteVolumeWarningDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.bouncy()
+                ) {
+                    Text("Включить усиление")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showAbsoluteVolumeWarningDialog = false },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.bouncy()
+                ) {
                     Text("Отмена")
                 }
             },

@@ -35,8 +35,7 @@ class SearchViewModel @Inject constructor(
     val player: PlayerManager
 ) : ViewModel() {
 
-    val recentSearches: StateFlow<List<String>> = searchHistoryRepo.recentQueries
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val recentSearches: StateFlow<List<com.materialy.music.data.repository.SearchHistoryEntry>> = searchHistoryRepo.recentEntries
 
     fun removeRecentSearch(q: String) = searchHistoryRepo.removeSearch(q)
     fun clearRecentSearches() = searchHistoryRepo.clearAll()
@@ -105,6 +104,9 @@ class SearchViewModel @Inject constructor(
             try {
                 val res = extractor.search(q, limit = 25)
                 _results.value = res
+                if (res.isNotEmpty() && InnertubeExtractor.extractVideoId(q) != null) {
+                    searchHistoryRepo.updateDisplayTitle(q, res[0].title)
+                }
             } catch (e: Exception) {
                 _results.value = emptyList()
                 _errorMessage.value = "Не удалось выполнить поиск. Проверьте подключение и повторите попытку."
