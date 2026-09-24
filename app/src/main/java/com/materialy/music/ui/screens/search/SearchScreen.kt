@@ -124,28 +124,33 @@ fun SearchScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // MD3 Search Input
+        // Material 3 Expressive Search Input (Floating Pill with soft shadow & spring interactions)
         OutlinedTextField(
             value = query,
             onValueChange = { viewModel.onQueryChange(it) },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(elevation = 4.dp, shape = RoundedCornerShape(26.dp), spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
             placeholder = { Text("Исполнитель, трек или ссылка", style = MaterialTheme.typography.bodyMedium) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Filled.Search,
                     contentDescription = "Поиск",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = MaterialTheme.colorScheme.primary
                 )
             },
             trailingIcon = {
                 if (query.isNotBlank()) {
-                    IconButton(onClick = { viewModel.onQueryChange("") }) {
+                    IconButton(
+                        onClick = { viewModel.onQueryChange("") },
+                        modifier = Modifier.bouncy()
+                    ) {
                         Icon(Icons.Filled.Clear, contentDescription = "Очистить")
                     }
                 }
             },
             singleLine = true,
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(26.dp),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(
                 onSearch = {
@@ -154,8 +159,8 @@ fun SearchScreen(
                 }
             ),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = Color.Transparent
             )

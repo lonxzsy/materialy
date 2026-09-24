@@ -119,7 +119,8 @@ fun SongItem(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .clip(RoundedCornerShape(18.dp))
+            .bouncy(scaleDown = 0.97f)
+            .clip(RoundedCornerShape(20.dp))
             .semantics {
                 stateDescription = when {
                     !isAvailable -> "Недоступен"
@@ -132,7 +133,7 @@ fun SongItem(
                 onLongClick = onLongClick,
                 onClick = onClick
             ),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.5.dp, animatedBorderColor),
         colors = CardDefaults.cardColors(
             containerColor = animatedContainerColor

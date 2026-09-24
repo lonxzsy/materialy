@@ -81,6 +81,7 @@ import com.materialy.music.data.repository.MusicRepository
 import com.materialy.music.data.repository.OnlineRepository
 import com.materialy.music.playback.PlayerManager
 import com.materialy.music.ui.components.AddToPlaylistSheet
+import com.materialy.music.ui.components.ExpressiveSegmentedButtonGroup
 import com.materialy.music.ui.components.MiniPlayer
 import com.materialy.music.ui.components.SongItem
 import com.materialy.music.ui.components.ToastManager
@@ -409,83 +410,55 @@ fun LibraryScreen(
                 .padding(vertical = 6.dp)
         )
 
-        // Filter Chips Row with smooth animated response
-        LazyRow(
+        // Material 3 Expressive Filter Controls: Offline Toggle + Segmented Button Group
+        val favCount = effectiveSongs.count { it.isFavorite }
+        val filterOptions = listOf(
+            LibraryFilter.ALL to "Все (${effectiveSongs.size})",
+            LibraryFilter.FAVORITES to "Избранное ($favCount)",
+            LibraryFilter.RECENT to "Недавние",
+            LibraryFilter.BY_ARTIST to "Авторы"
+        )
+
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            item {
-                FilterChip(
-                    selected = isOfflineMode,
-                    onClick = {
-                        val next = !isOfflineMode
-                        viewModel.toggleOfflineMode(next)
-                        if (next) {
-                            ToastManager.info("Режим офлайн: только загруженные треки")
-                        } else {
-                            ToastManager.info("Режим офлайн отключен")
-                        }
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (isOfflineMode) Icons.Filled.CloudOff else Icons.Filled.CloudQueue,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = if (isOfflineMode) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    label = { Text("Офлайн") },
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.bouncy()
-                )
-            }
-            item {
-                FilterChip(
-                    selected = selectedFilter == LibraryFilter.ALL,
-                    onClick = { selectedFilter = LibraryFilter.ALL },
-                    label = { Text("Все (${effectiveSongs.size})") },
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.bouncy()
-                )
-            }
-            item {
-                val favCount = effectiveSongs.count { it.isFavorite }
-                FilterChip(
-                    selected = selectedFilter == LibraryFilter.FAVORITES,
-                    onClick = { selectedFilter = LibraryFilter.FAVORITES },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Filled.Favorite,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = if (selectedFilter == LibraryFilter.FAVORITES) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.primary
-                        )
-                    },
-                    label = { Text("Избранное ($favCount)") },
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.bouncy()
-                )
-            }
-            item {
-                FilterChip(
-                    selected = selectedFilter == LibraryFilter.RECENT,
-                    onClick = { selectedFilter = LibraryFilter.RECENT },
-                    label = { Text("Недавние") },
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.bouncy()
-                )
-            }
-            item {
-                FilterChip(
-                    selected = selectedFilter == LibraryFilter.BY_ARTIST,
-                    onClick = { selectedFilter = LibraryFilter.BY_ARTIST },
-                    label = { Text("По авторам") },
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.bouncy()
-                )
-            }
+            FilterChip(
+                selected = isOfflineMode,
+                onClick = {
+                    val next = !isOfflineMode
+                    viewModel.toggleOfflineMode(next)
+                    if (next) {
+                        ToastManager.info("Режим офлайн: только загруженные треки")
+                    } else {
+                        ToastManager.info("Режим офлайн отключен")
+                    }
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = if (isOfflineMode) Icons.Filled.CloudOff else Icons.Filled.CloudQueue,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = if (isOfflineMode) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                label = { Text("Офлайн") },
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.bouncy()
+            )
+
+            ExpressiveSegmentedButtonGroup(
+                items = filterOptions,
+                selectedIndex = filterOptions.indexOfFirst { it.first == selectedFilter }.coerceAtLeast(0),
+                onItemSelected = { index ->
+                    selectedFilter = filterOptions[index].first
+                },
+                labelProvider = { it.second },
+                modifier = Modifier.weight(1f)
+            )
         }
 
         AnimatedVisibility(

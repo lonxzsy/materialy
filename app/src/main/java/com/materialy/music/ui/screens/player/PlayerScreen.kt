@@ -109,6 +109,8 @@ import com.materialy.music.data.repository.LyricsRepository
 import com.materialy.music.data.repository.MusicRepository
 import com.materialy.music.playback.PlayerManager
 import com.materialy.music.ui.components.BouncyHeartButton
+import com.materialy.music.ui.components.ExpressivePlayPauseButton
+import com.materialy.music.ui.components.ExpressiveSlider
 import com.materialy.music.ui.components.ToastManager
 import com.materialy.music.ui.components.bouncy
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -508,30 +510,9 @@ fun PlayerScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Tactile Seek Bar (Progress Slider with spring dynamics)
+            // Material 3 Expressive Tactile Seek Bar (Thick Track, Inset/Elastic Thumb, Floating Tooltip)
             Column(modifier = Modifier.fillMaxWidth()) {
-                AnimatedVisibility(
-                    visible = isDraggingSlider,
-                    enter = fadeIn() + scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)),
-                    exit = fadeOut() + scaleOut(),
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    ) {
-                        Text(
-                            text = String.format("%d:%02d / %d:%02d", curMins, curSecs, totalMins, totalSecs),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-
-                Slider(
+                ExpressiveSlider(
                     value = sliderProgress,
                     onValueChange = {
                         isDraggingSlider = true
@@ -541,18 +522,19 @@ fun PlayerScreen(
                         isDraggingSlider = false
                         viewModel.player.seekTo((dragPosition * safeDuration).toLong())
                     },
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    ),
+                    isPlaying = isPlaying,
+                    trackHeight = 12.dp,
+                    formattedCurrentTime = String.format("%d:%02d", curMins, curSecs),
+                    formattedTotalTime = String.format("%d:%02d", totalMins, totalSecs),
+                    activeColor = MaterialTheme.colorScheme.primary,
+                    thumbColor = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp),
+                        .padding(horizontal = 6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
@@ -608,24 +590,16 @@ fun PlayerScreen(
                     )
                 }
 
-                // Play / Pause MD3 Large Button (72dp)
-                FilledIconButton(
+                // Expressive Play / Pause Hero Button (76dp)
+                ExpressivePlayPauseButton(
+                    isPlaying = isPlaying,
                     onClick = { viewModel.player.togglePlayPause() },
-                    modifier = Modifier
-                        .size(72.dp)
-                        .shadow(12.dp, CircleShape, spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
-                        .bouncy(scaleDown = 0.92f),
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (isPlaying) "Пауза" else "Воспроизведение",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(38.dp)
-                    )
-                }
+                    size = 76.dp,
+                    iconSize = 40.dp,
+                    bassEnergy = bassEnergy,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
 
                 // Next Track
                 IconButton(
