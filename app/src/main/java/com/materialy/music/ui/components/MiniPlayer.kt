@@ -245,15 +245,21 @@ fun MiniPlayer(
                             Icon(Icons.Filled.SkipPrevious, contentDescription = "Предыдущий", modifier = Modifier.size(20.dp))
                         }
 
-                        ExpressivePlayPauseButton(
-                            isPlaying = isPlaying,
+                        FilledIconButton(
                             onClick = onPlayPause,
-                            size = 46.dp,
-                            iconSize = 24.dp,
-                            bassEnergy = bassEnergy,
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        )
+                            modifier = Modifier
+                                .size(48.dp)
+                                .bouncy(scaleDown = 0.90f),
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                contentDescription = if (isPlaying) "Приостановить" else "Продолжить воспроизведение",
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
 
                         IconButton(
                             onClick = onNext,
@@ -265,18 +271,14 @@ fun MiniPlayer(
                         }
                     }
 
-                    // Material 3 Expressive Wavy Progress Line
-                    ExpressiveWavyProgressIndicator(
-                        progress = animatedProgress,
-                        isPlaying = isPlaying,
-                        bassEnergy = bassEnergy,
-                        waveHeight = 3.dp,
-                        strokeWidth = 3.dp,
-                        activeColor = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    // Bottom Progress Bar
+                    LinearProgressIndicator(
+                        progress = { animatedProgress },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 4.dp)
+                            .height(3.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                     )
                 }
             }

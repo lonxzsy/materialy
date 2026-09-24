@@ -33,6 +33,9 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Waves
 import com.materialy.music.ui.screens.wave.MyWaveScreen
 import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -58,9 +61,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.materialy.music.ui.components.CustomToastHost
-import com.materialy.music.ui.components.ExpressiveNavigationBar
 import com.materialy.music.ui.components.MiniPlayer
-import com.materialy.music.ui.components.NavigationTabItem
 import com.materialy.music.ui.screens.download.DownloadScreen
 import com.materialy.music.ui.screens.home.HomeScreen
 import com.materialy.music.ui.screens.library.LibraryScreen
@@ -407,21 +408,43 @@ private fun PlayerDock(
                 onPrev = { viewModel.player.previous() },
                 onClick = onOpenPlayer
             )
-            val navTabs = remember(tabs) {
-                tabs.map { screen ->
-                    NavigationTabItem(
-                        route = screen.route,
-                        label = screen.label,
-                        icon = screen.icon
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                tonalElevation = 6.dp,
+                modifier = Modifier
+                    .shadow(elevation = 10.dp, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                    .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+            ) {
+                tabs.forEach { screen ->
+                    val isSelected = currentRoute == screen.route
+                    NavigationBarItem(
+                        selected = isSelected,
+                        onClick = { if (currentRoute != screen.route) onNavigateToTab(screen.route) },
+                        modifier = Modifier.bouncy(scaleDown = 0.92f),
+                        icon = {
+                            Icon(
+                                imageVector = screen.icon,
+                                contentDescription = screen.label,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        },
+                        label = {
+                            Text(
+                                text = screen.label,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     )
                 }
             }
-
-            ExpressiveNavigationBar(
-                items = navTabs,
-                currentRoute = currentRoute,
-                onNavigateToTab = onNavigateToTab
-            )
         }
     }
 }

@@ -1,6 +1,6 @@
 {
-  "versionCode": 7,
-  "versionName": "1.1.4",
-  "downloadUrl": "https://github.com/lonxzsy/materialy/releases/download/v1.1.4/app-release.apk",
-  "releaseNotes": "Mise à jour Materialy Music v1.1.4 - Nouveaux composants Material 3 Expressive & Animations améliorées :\n• ExpressiveSlider : Nouveau slider audio avec piste épaisse et arrondie, curseur tactile avec rebond élastique (spring physics), ondulation fluide de la musique en lecture et infobulle temporelle flottante lors du défilement\n• ExpressiveWavyProgressIndicator : Ligne de progression ondulatoire fluide intégrée au mini-lecteur, réactive en temps réel aux basses et au rythme de la musique\n• ExpressiveNavigationBar : Nouvelle barre de navigation ergonomique (66dp) avec indicateur coulissant continu à étirement élastique et rebond des icônes\n• ExpressiveSegmentedButtonGroup : Nouveaux groupes de boutons segmentés avec pastille de sélection fluide dans la médiathèque\n• ExpressivePlayPauseButton : Bouton de lecture héroïque avec morphing de forme dynamique (carré adouci en pause, cercle en lecture) et aura lumineuse ambiante\n• ExpressiveSongCard : Cartes de morceaux avec retour tactile rebondissant et égaliseur animé à barres sautantes\n• ExpressiveSearchBar : Barre de recherche flottante modernisée avec ombre douce et animations dynamiques"
+  "versionCode": 8,
+  "versionName": "1.1.5",
+  "downloadUrl": "https://github.com/lonxzsy/materialy/releases/download/v1.1.5/app-release.apk",
+  "releaseNotes": "Mise à jour Materialy Music v1.1.5 :\n• Rétablissement complet de la barre de navigation originale (NavigationBar standard avec libellés et icônes parfaitement lisibles et centrés)\n• Rétablissement du mini-lecteur d'origine (MiniPlayer avec boutons et barre de progression native)\n• Conservation des nouveaux composants Material 3 Expressive pour le grand lecteur (ExpressiveSlider avec piste épaisse, infobulle de défilement, ExpressivePlayPauseButton) et pour la médiathèque (ExpressiveSegmentedButtonGroup)"
 }
