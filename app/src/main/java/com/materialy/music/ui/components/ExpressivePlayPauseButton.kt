@@ -31,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -82,16 +81,6 @@ fun ExpressivePlayPauseButton(
             stiffness = Spring.StiffnessMediumLow
         ),
         label = "expressiveCornerRadius"
-    )
-
-    // Icon rotation on toggle
-    val iconRotation by animateFloatAsState(
-        targetValue = if (isPlaying) 90f else 0f,
-        animationSpec = spring(
-            dampingRatio = 0.75f,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "expressiveIconRotation"
     )
 
     // Ambient pulse ring when playing
@@ -158,7 +147,6 @@ fun ExpressivePlayPauseButton(
             contentAlignment = Alignment.Center
         ) {
             Box(
-                modifier = Modifier.rotate(iconRotation),
                 contentAlignment = Alignment.Center
             ) {
                 Crossfade(

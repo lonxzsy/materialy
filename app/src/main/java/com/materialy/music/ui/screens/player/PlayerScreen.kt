@@ -42,6 +42,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.DownloadForOffline
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -468,16 +469,18 @@ fun PlayerScreen(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val context = LocalContext.current
+                    val currentSong = song
+                    val isOffline = currentSong != null && (currentSong.isOfflineAvailable() || currentSong.fileUri.startsWith("file://") || currentSong.fileUri.startsWith("content://"))
                     IconButton(
                         onClick = {
-                            if (song != null && !song!!.fileUri.startsWith("file://") && !song!!.fileUri.startsWith("content://")) {
+                            if (currentSong != null && !isOffline) {
                                 TrackDownloadManager.download(
                                     context = context,
-                                    title = song!!.title,
-                                    artist = song!!.artistName,
-                                    sourceUrl = song!!.fileUri,
-                                    thumbnailUrl = song!!.artworkPath,
-                                    durationSec = song!!.durationMs / 1000
+                                    title = currentSong.title,
+                                    artist = currentSong.artistName,
+                                    sourceUrl = currentSong.fileUri,
+                                    thumbnailUrl = currentSong.artworkPath,
+                                    durationSec = currentSong.durationMs / 1000
                                 )
                             } else {
                                 ToastManager.info("Этот трек уже сохранен на устройстве")
@@ -488,9 +491,9 @@ fun PlayerScreen(
                             .bouncy(scaleDown = 0.92f)
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.CloudDownload,
-                            contentDescription = "Скачать трек",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            imageVector = if (isOffline) Icons.Filled.DownloadForOffline else Icons.Filled.CloudDownload,
+                            contentDescription = if (isOffline) "Трек скачан (офлайн)" else "Скачать трек",
+                            tint = if (isOffline) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             modifier = Modifier.size(24.dp)
                         )
                     }

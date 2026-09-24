@@ -1,6 +1,6 @@
 {
-  "versionCode": 8,
-  "versionName": "1.1.5",
-  "downloadUrl": "https://github.com/lonxzsy/materialy/releases/download/v1.1.5/app-release.apk",
-  "releaseNotes": "Mise à jour Materialy Music v1.1.5 :\n• Rétablissement complet de la barre de navigation originale (NavigationBar standard avec libellés et icônes parfaitement lisibles et centrés)\n• Rétablissement du mini-lecteur d'origine (MiniPlayer avec boutons et barre de progression native)\n• Conservation des nouveaux composants Material 3 Expressive pour le grand lecteur (ExpressiveSlider avec piste épaisse, infobulle de défilement, ExpressivePlayPauseButton) et pour la médiathèque (ExpressiveSegmentedButtonGroup)"
+  "versionCode": 9,
+  "versionName": "1.1.6",
+  "downloadUrl": "https://github.com/lonxzsy/materialy/releases/download/v1.1.6/app-release.apk",
+  "releaseNotes": "Обновление Materialy Music v1.1.6:\n• Исправлено отображение иконки паузы в плеере: устранена ошибочная ротация на 90 градусов, из-за которой иконка превращалась в горизонтальные полосы\n• Исправлена иконка загрузки/оффлайн рядом с названием трека в плеере: теперь корректно отображается иконка сохраненного оффлайн-трека"
 }
